@@ -14,8 +14,6 @@ import com.antss_prescription.repository.UserRepository;
 import com.antss_prescription.service.AdminService;
 import com.antss_prescription.service.EmailService;
 import org.modelmapper.ModelMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;

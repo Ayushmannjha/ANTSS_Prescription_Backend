@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 public class Doctor {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)

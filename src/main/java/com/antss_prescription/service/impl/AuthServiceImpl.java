@@ -125,7 +125,16 @@ public class AuthServiceImpl implements AuthService {
 
         LocalDate curr = LocalDate.now();
         LocalDate exp = user.getSubscriptionEnd();
-        if(curr.isAfter(exp)) throw new UnauthorizedException("Your subscription has expired");
+        if(curr.isAfter(exp)) {
+            user.setStatus(RegistrationStatus.EXPIRED);
+            userRepository.save(user);
+            loginSessionRepository.expireAllSessionsForUser(user);
+            emailService.sendExpiryReminderEmail(user.getEmail(), user.getFullName());
+
+            log.info("User subscription expired: {}", user.getEmail());
+
+            throw new UnauthorizedException("Your subscription has expired");
+        }
 
         SubscriptionPackage pkg = user.getSubscriptionPackage();
         if (pkg != null && pkg.getDeviceLimit() == 1) {
