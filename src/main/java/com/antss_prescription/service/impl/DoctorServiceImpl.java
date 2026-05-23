@@ -1,0 +1,387 @@
+package com.antss_prescription.service.impl;
+
+import com.antss_prescription.dto.request.CreateDoctorRequest;
+import com.antss_prescription.dto.request.UpdateDoctorRequest;
+import com.antss_prescription.dto.response.DoctorResponse;
+import com.antss_prescription.entity.*;
+import com.antss_prescription.enums.*;
+import com.antss_prescription.exception.BusinessException;
+import com.antss_prescription.exception.ResourceNotFoundException;
+import com.antss_prescription.repository.*;
+import com.antss_prescription.service.DoctorService;
+import com.antss_prescription.service.EmailService;
+import org.modelmapper.ModelMapper;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
+
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Service
+@Transactional
+public class DoctorServiceImpl implements DoctorService {
+
+    private final DoctorRepository doctorRepository;
+    private final HospitalRepository hospitalRepository;
+    private final ClinicRepository clinicRepository;
+    private final UserRepository userRepository;
+    private final UserSubscriptionRepository userSubscriptionRepository;
+    private final SubscriptionDoctorAllocationRepository allocationRepository;
+    private final LoginCredentialRepository loginCredentialRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
+    private final ModelMapper modelMapper;
+
+    public DoctorServiceImpl(DoctorRepository doctorRepository,
+                             HospitalRepository hospitalRepository,
+                             ClinicRepository clinicRepository,
+                             UserRepository userRepository,
+                             UserSubscriptionRepository userSubscriptionRepository,
+                             SubscriptionDoctorAllocationRepository allocationRepository,
+                             LoginCredentialRepository loginCredentialRepository,
+                             PasswordEncoder passwordEncoder,
+                             EmailService emailService,
+                             ModelMapper modelMapper) {
+        this.doctorRepository = doctorRepository;
+        this.hospitalRepository = hospitalRepository;
+        this.clinicRepository = clinicRepository;
+        this.userRepository = userRepository;
+        this.userSubscriptionRepository = userSubscriptionRepository;
+        this.allocationRepository = allocationRepository;
+        this.loginCredentialRepository = loginCredentialRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.emailService = emailService;
+        this.modelMapper = modelMapper;
+    }
+
+    @Override
+    public DoctorResponse addDoctor(CreateDoctorRequest request, UUID userId) {
+        User caller = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BusinessException("Email already registered: " + request.getEmail());
+        }
+
+        Hospital hospital = null;
+        Clinic clinic = null;
+        User owner = null;
+
+        if (caller.getUserType() == UserType.HOSPITAL) {
+            if (request.getHospitalId() == null) {
+                List<Hospital> hospitals = hospitalRepository.findByUserId(userId);
+                if (hospitals.isEmpty()) {
+                    hospitals = hospitalRepository.findByOwnerId(userId);
+                }
+                if (hospitals.isEmpty()) {
+                    throw new BusinessException("Hospital not found for user");
+                }
+                hospital = hospitals.get(0);
+            } else {
+                hospital = hospitalRepository.findById(request.getHospitalId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Hospital", request.getHospitalId()));
+                if (!hospital.getUser().getId().equals(userId) && !hospital.getOwner().getId().equals(userId)) {
+                    throw new BusinessException("Unauthorized hospital access");
+                }
+            }
+            owner = hospital.getOwner();
+        } else {
+            if (request.getClinicId() == null) {
+                List<Clinic> clinics = clinicRepository.findByUserId(userId);
+                if (clinics.isEmpty()) {
+                    clinics = clinicRepository.findByOwnerId(userId);
+                }
+                if (clinics.isEmpty()) {
+                    throw new BusinessException("Clinic not found for user");
+                }
+                clinic = clinics.get(0);
+            } else {
+                clinic = clinicRepository.findById(request.getClinicId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Clinic", request.getClinicId()));
+                if (!clinic.getUser().getId().equals(userId) && !clinic.getOwner().getId().equals(userId)) {
+                    throw new BusinessException("Unauthorized clinic access");
+                }
+            }
+            owner = clinic.getOwner();
+        }
+
+        UUID ownerId = owner.getId();
+
+        List<UserSubscription> activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(ownerId, SubscriptionStatus.ACTIVE);
+        int totalAllowedDoctors = activeSubs.stream().mapToInt(UserSubscription::getAllowedDoctors).sum();
+
+        int activeDoctors = getActiveDoctorCountForUser(ownerId, owner.getUserType());
+
+        if (activeDoctors >= totalAllowedDoctors) {
+            throw new BusinessException("Doctor limit reached (" + totalAllowedDoctors + "). Please purchase doctor addons to add more doctors.");
+        }
+
+        java.time.LocalDate subEndDate = activeSubs.isEmpty()
+                ? java.time.LocalDate.now().plusYears(1)
+                : activeSubs.get(0).getEndDate();
+
+
+        String plainPassword = generateSecurePassword(12);
+        User doctorUser = new User();
+        doctorUser.setFullName(request.getDoctorName());
+        doctorUser.setEmail(request.getEmail());
+        doctorUser.setMobileNumber(request.getMobileNumber());
+        doctorUser.setPassword(passwordEncoder.encode(plainPassword));
+        doctorUser.setUserType(UserType.DOCTOR);
+        doctorUser.setStatus(RegistrationStatus.APPROVED);
+        doctorUser.setRole(Role.ROLE_USER);
+        User savedDoctorUser = userRepository.save(doctorUser);
+
+        LoginCredential credential = new LoginCredential();
+        credential.setUser(savedDoctorUser);
+        credential.setUsername(request.getEmail());
+        credential.setPasswordHash(passwordEncoder.encode(plainPassword));
+        loginCredentialRepository.save(credential);
+
+        Doctor doctor = new Doctor();
+        doctor.setDoctorName(request.getDoctorName());
+        doctor.setSpecialization(request.getSpecialization());
+        doctor.setQualification(request.getQualification());
+        doctor.setExperienceYears(request.getExperienceYears());
+        doctor.setEmail(request.getEmail());
+        doctor.setMobileNumber(request.getMobileNumber());
+        doctor.setRegistrationNumber(request.getRegistrationNumber());
+        doctor.setSignatureUrl(request.getSignatureUrl());
+        doctor.setDoctorCode(generateUniqueDoctorCode());
+        doctor.setStatus(EntityStatus.ACTIVE);
+        doctor.setUser(savedDoctorUser);
+
+        if (hospital != null) {
+            doctor.setHospital(hospital);
+            hospital.setActiveDoctorCount(hospital.getActiveDoctorCount() + 1);
+            hospitalRepository.save(hospital);
+        } else {
+            doctor.setClinic(clinic);
+            clinic.setActiveDoctorCount(clinic.getActiveDoctorCount() + 1);
+            clinicRepository.save(clinic);
+        }
+
+        Doctor savedDoctor = doctorRepository.save(doctor);
+
+        allocateDoctorToSubscription(savedDoctor, activeSubs);
+
+        emailService.sendCredentialsEmail(
+                request.getEmail(),
+                request.getDoctorName(),
+                request.getEmail(),
+                plainPassword,
+                "Doctor",
+                subEndDate
+        );
+
+        log.info("Doctor added: {} with code {}", savedDoctor.getDoctorName(), savedDoctor.getDoctorCode());
+        return mapToResponse(savedDoctor);
+    }
+
+    @Override
+    public DoctorResponse updateDoctor(UUID id, UpdateDoctorRequest request, UUID userId) {
+        Doctor doctor = getDoctorAndVerifyAccess(id, userId);
+
+        EntityStatus oldStatus = doctor.getStatus();
+        doctor.setDoctorName(request.getDoctorName());
+        doctor.setSpecialization(request.getSpecialization());
+        doctor.setQualification(request.getQualification());
+        doctor.setExperienceYears(request.getExperienceYears());
+        doctor.setEmail(request.getEmail());
+        doctor.setMobileNumber(request.getMobileNumber());
+        doctor.setRegistrationNumber(request.getRegistrationNumber());
+        doctor.setSignatureUrl(request.getSignatureUrl());
+        EntityStatus newStatus = request.getStatus();
+        doctor.setStatus(newStatus);
+        Doctor saved = doctorRepository.save(doctor);
+
+        if (oldStatus == EntityStatus.ACTIVE && newStatus == EntityStatus.INACTIVE) {
+            deallocateDoctor(doctor);
+            decrementActiveDoctorCount(doctor);
+        } else if (oldStatus == EntityStatus.INACTIVE && newStatus == EntityStatus.ACTIVE) {
+            User owner = (doctor.getHospital() != null) ? doctor.getHospital().getOwner() : doctor.getClinic().getOwner();
+            UUID ownerId = (owner != null) ? owner.getId() : userId;
+            UserType ownerType = (owner != null) ? owner.getUserType() : UserType.HOSPITAL;
+            List<UserSubscription> activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(ownerId, SubscriptionStatus.ACTIVE);
+            int totalAllowedDoctors = activeSubs.stream().mapToInt(UserSubscription::getAllowedDoctors).sum();
+            int activeDoctors = getActiveDoctorCountForUser(ownerId, ownerType);
+
+            if (activeDoctors >= totalAllowedDoctors) {
+                doctor.setStatus(EntityStatus.INACTIVE);
+                doctorRepository.save(doctor);
+                throw new BusinessException("Cannot activate doctor: Doctor limit reached (" + totalAllowedDoctors + ").");
+            }
+
+            incrementActiveDoctorCount(doctor);
+            allocateDoctorToSubscription(doctor, activeSubs);
+        }
+
+        log.info("Doctor updated: {}", saved.getDoctorName());
+        return mapToResponse(saved);
+    }
+
+    @Override
+    public void deleteDoctor(UUID id, UUID userId) {
+        Doctor doctor = getDoctorAndVerifyAccess(id, userId);
+        if (doctor.getStatus() == EntityStatus.ACTIVE) {
+            deallocateDoctor(doctor);
+            decrementActiveDoctorCount(doctor);
+        }
+        doctor.setStatus(EntityStatus.INACTIVE);
+        doctorRepository.save(doctor);
+        log.info("Doctor deleted (marked inactive): {}", doctor.getDoctorName());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DoctorResponse> listDoctors(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+
+        List<Doctor> doctors = new ArrayList<>();
+        if (user.getUserType() == UserType.HOSPITAL) {
+            List<Hospital> hospitals = hospitalRepository.findByUserIdOrOwnerId(userId, userId);
+            for (Hospital h : hospitals) {
+                doctors.addAll(doctorRepository.findByHospital(h));
+            }
+        } else {
+            List<Clinic> clinics = clinicRepository.findByUserIdOrOwnerId(userId, userId);
+            for (Clinic c : clinics) {
+                doctors.addAll(doctorRepository.findByClinic(c));
+            }
+        }
+
+        return doctors.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DoctorResponse getDoctorById(UUID id, UUID userId) {
+        Doctor doctor = getDoctorAndVerifyAccess(id, userId);
+        return mapToResponse(doctor);
+    }
+
+    private Doctor getDoctorAndVerifyAccess(UUID id, UUID userId) {
+        Doctor doctor = doctorRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor", id));
+
+        boolean hasAccess = false;
+        if (doctor.getHospital() != null && 
+            (doctor.getHospital().getUser().getId().equals(userId) || doctor.getHospital().getOwner().getId().equals(userId))) {
+            hasAccess = true;
+        } else if (doctor.getClinic() != null && 
+            (doctor.getClinic().getUser().getId().equals(userId) || doctor.getClinic().getOwner().getId().equals(userId))) {
+            hasAccess = true;
+        }
+
+        if (!hasAccess) {
+            throw new BusinessException("Unauthorized access to doctor resource");
+        }
+        return doctor;
+    }
+
+    private int getActiveDoctorCountForUser(UUID userId, UserType type) {
+        if (type == UserType.HOSPITAL) {
+            List<Hospital> hospitals = hospitalRepository.findByUserIdOrOwnerId(userId, userId);
+            return hospitals.stream().mapToInt(Hospital::getActiveDoctorCount).sum();
+        } else {
+            List<Clinic> clinics = clinicRepository.findByUserIdOrOwnerId(userId, userId);
+            return clinics.stream().mapToInt(Clinic::getActiveDoctorCount).sum();
+        }
+    }
+
+    private void allocateDoctorToSubscription(Doctor doctor, List<UserSubscription> activeSubs) {
+        for (UserSubscription sub : activeSubs) {
+            if (sub.getUsedDoctors() < sub.getAllowedDoctors()) {
+                sub.setUsedDoctors(sub.getUsedDoctors() + 1);
+                userSubscriptionRepository.save(sub);
+
+                SubscriptionDoctorAllocation allocation = new SubscriptionDoctorAllocation();
+                allocation.setUserSubscription(sub);
+                allocation.setDoctor(doctor);
+                allocation.setAllocationType(sub.getUsedDoctors() <= sub.getSubscriptionPackage().getBaseDoctorLimit() ? AllocationType.BASE : AllocationType.ADDON);
+                allocation.setStatus(AllocationStatus.ACTIVE);
+                allocationRepository.save(allocation);
+                return;
+            }
+        }
+        throw new BusinessException("No available subscription slots to allocate the doctor");
+    }
+
+    private void deallocateDoctor(Doctor doctor) {
+        List<SubscriptionDoctorAllocation> allocations = allocationRepository.findByDoctorAndStatus(doctor, AllocationStatus.ACTIVE);
+        for (SubscriptionDoctorAllocation alloc : allocations) {
+            alloc.setStatus(AllocationStatus.INACTIVE);
+            allocationRepository.save(alloc);
+
+            UserSubscription sub = alloc.getUserSubscription();
+            if (sub.getUsedDoctors() > 0) {
+                sub.setUsedDoctors(sub.getUsedDoctors() - 1);
+                userSubscriptionRepository.save(sub);
+            }
+        }
+    }
+
+    private void decrementActiveDoctorCount(Doctor doctor) {
+        if (doctor.getHospital() != null) {
+            Hospital h = doctor.getHospital();
+            if (h.getActiveDoctorCount() > 0) {
+                h.setActiveDoctorCount(h.getActiveDoctorCount() - 1);
+                hospitalRepository.save(h);
+            }
+        } else if (doctor.getClinic() != null) {
+            Clinic c = doctor.getClinic();
+            if (c.getActiveDoctorCount() > 0) {
+                c.setActiveDoctorCount(c.getActiveDoctorCount() - 1);
+                clinicRepository.save(c);
+            }
+        }
+    }
+
+    private void incrementActiveDoctorCount(Doctor doctor) {
+        if (doctor.getHospital() != null) {
+            Hospital h = doctor.getHospital();
+            h.setActiveDoctorCount(h.getActiveDoctorCount() + 1);
+            hospitalRepository.save(h);
+        } else if (doctor.getClinic() != null) {
+            Clinic c = doctor.getClinic();
+            c.setActiveDoctorCount(c.getActiveDoctorCount() + 1);
+            clinicRepository.save(c);
+        }
+    }
+
+    private DoctorResponse mapToResponse(Doctor doctor) {
+        DoctorResponse res = modelMapper.map(doctor, DoctorResponse.class);
+        if (doctor.getHospital() != null) {
+            res.setHospitalId(doctor.getHospital().getId());
+        }
+        if (doctor.getClinic() != null) {
+            res.setClinicId(doctor.getClinic().getId());
+        }
+        return res;
+    }
+
+    private String generateUniqueDoctorCode() {
+        String code;
+        do {
+            code = "DOC-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        } while (doctorRepository.findByDoctorCode(code).isPresent());
+        return code;
+    }
+
+    private String generateSecurePassword(int length) {
+        final String CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$!";
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            sb.append(CHARS.charAt(random.nextInt(CHARS.length())));
+        }
+        return sb.toString();
+    }
+}
