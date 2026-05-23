@@ -1,37 +1,41 @@
 package com.antss_prescription.entity;
 
+import com.antss_prescription.enums.DurationType;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
-@Table(name = "packages")
+@Table(name = "subscription_packages")
 @Data
 public class SubscriptionPackage {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @Column(nullable = false, unique = true)
-    private String name;
+    private String packageName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private DurationType durationType;
 
     @Column(nullable = false)
-    private Integer validityDays;
+    private Integer baseDoctorLimit;
+
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal packagePrice;
+
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal extraDoctorPrice;
+
+    @Column(columnDefinition = "TEXT")
+    private String features;
 
     @Column(nullable = false)
-    private Integer doctorLimit;
-
-    @Column(nullable = false)
-    private Integer deviceLimit;
-
-    @Column(nullable = false)
-    private BigDecimal price;
-
-    @Column(nullable = false)
-    private boolean active;
+    private boolean isActive;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -2,10 +2,11 @@ package com.antss_prescription.entity;
 
 import com.antss_prescription.enums.RegistrationStatus;
 import com.antss_prescription.enums.Role;
+import com.antss_prescription.enums.UserType;
 import jakarta.persistence.*;
 import lombok.Data;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -20,29 +21,18 @@ public class User {
     @Column(nullable = false)
     private String fullName;
 
-    @Column(nullable = false)
-    private String clinicName;
-
     @Column(nullable = false, unique = true)
     private String email;
 
     @Column(nullable = false)
-    private String mobile;
-
-    private String address;
-    private String city;
-    private String state;
-    private String country;
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "package_id")
-    private SubscriptionPackage subscriptionPackage;
-
-    @Column(nullable = false)
-    private Integer numDoctors;
+    private String mobileNumber;
 
     @Column(nullable = false)
     private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserType userType;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -52,8 +42,14 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
-    private LocalDate subscriptionStart;
-    private LocalDate subscriptionEnd;
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime registrationDate;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "approved_by")
+    private User approvedBy;
+
+    private LocalDateTime approvedAt;
 
     private String passwordResetToken;
     private LocalDateTime passwordResetExpiry;
@@ -63,8 +59,12 @@ public class User {
 
     private LocalDateTime updatedAt;
 
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<UserSubscription> subscriptions;
+
     @PrePersist
     protected void onCreate() {
+        registrationDate = LocalDateTime.now();
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
     }

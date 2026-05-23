@@ -1,7 +1,10 @@
 package com.antss_prescription.dto.response;
 
-import java.time.LocalDate;
-
+import java.time.LocalDateTime;
+import java.util.UUID;
+import com.antss_prescription.enums.Role;
+import com.antss_prescription.enums.UserType;
+import com.antss_prescription.enums.RegistrationStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -10,22 +13,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class UserResponse {
-
-    private Long id;
+    private UUID id;
     private String fullName;
-    private String clinicName;
     private String email;
-    private String mobile;
-    private String address;
-    private String city;
-    private String state;
-    private String country;
-    private String status;
-    private String role;
-    private Integer numDoctors;
-    private String packageName;
-    private Integer packageDoctorLimit;
-    private Integer packageDeviceLimit;
-    private LocalDate subscriptionStart;
-    private LocalDate subscriptionEnd;
+    private String mobileNumber;
+    private UserType userType;
+    private RegistrationStatus status;
+    private Role role;
+    private LocalDateTime registrationDate;
+    private LocalDateTime createdAt;
 }

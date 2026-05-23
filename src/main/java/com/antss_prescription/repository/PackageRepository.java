@@ -8,6 +8,6 @@ import java.util.List;
 
 @Repository
 public interface PackageRepository extends JpaRepository<SubscriptionPackage, Long> {
-    List<SubscriptionPackage> findByActiveTrue();
-    boolean existsByName(String name);
+    List<SubscriptionPackage> findByIsActiveTrue();
+    boolean existsByPackageName(String packageName);
 }

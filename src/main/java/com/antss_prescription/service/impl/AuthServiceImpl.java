@@ -3,23 +3,15 @@ package com.antss_prescription.service.impl;
 import com.antss_prescription.dto.request.*;
 import com.antss_prescription.dto.response.AuthResponse;
 import com.antss_prescription.dto.response.UserResponse;
-import com.antss_prescription.entity.LoginSession;
-import com.antss_prescription.entity.SubscriptionPackage;
-import com.antss_prescription.entity.User;
-import com.antss_prescription.enums.RegistrationStatus;
-import com.antss_prescription.enums.Role;
+import com.antss_prescription.entity.*;
+import com.antss_prescription.enums.*;
 import com.antss_prescription.exception.BusinessException;
 import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.exception.UnauthorizedException;
-import com.antss_prescription.repository.LoginSessionRepository;
-import com.antss_prescription.repository.PackageRepository;
-import com.antss_prescription.repository.UserRepository;
+import com.antss_prescription.repository.*;
 import com.antss_prescription.security.JwtTokenProvider;
 import com.antss_prescription.service.AuthService;
 import com.antss_prescription.service.EmailService;
-import org.modelmapper.ModelMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -36,14 +28,16 @@ import java.util.UUID;
 @Transactional
 public class AuthServiceImpl implements AuthService {
 
-
     private final UserRepository userRepository;
     private final PackageRepository packageRepository;
     private final LoginSessionRepository loginSessionRepository;
+    private final HospitalRepository hospitalRepository;
+    private final ClinicRepository clinicRepository;
+    private final UserSubscriptionRepository userSubscriptionRepository;
+    private final LoginCredentialRepository loginCredentialRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailService emailService;
-    private final ModelMapper modelMapper;
 
     @Value("${app.admin.email}")
     private String adminEmail;
@@ -51,17 +45,23 @@ public class AuthServiceImpl implements AuthService {
     public AuthServiceImpl(UserRepository userRepository,
                            PackageRepository packageRepository,
                            LoginSessionRepository loginSessionRepository,
+                           HospitalRepository hospitalRepository,
+                           ClinicRepository clinicRepository,
+                           UserSubscriptionRepository userSubscriptionRepository,
+                           LoginCredentialRepository loginCredentialRepository,
                            PasswordEncoder passwordEncoder,
                            JwtTokenProvider jwtTokenProvider,
-                           EmailService emailService,
-                           ModelMapper modelMapper) {
+                           EmailService emailService) {
         this.userRepository = userRepository;
         this.packageRepository = packageRepository;
         this.loginSessionRepository = loginSessionRepository;
+        this.hospitalRepository = hospitalRepository;
+        this.clinicRepository = clinicRepository;
+        this.userSubscriptionRepository = userSubscriptionRepository;
+        this.loginCredentialRepository = loginCredentialRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
         this.emailService = emailService;
-        this.modelMapper = modelMapper;
     }
 
     @Override
@@ -82,25 +82,84 @@ public class AuthServiceImpl implements AuthService {
 
         User user = new User();
         user.setFullName(request.getFullName());
-        user.setClinicName(request.getClinicName());
         user.setEmail(request.getEmail());
-        user.setMobile(request.getMobile());
-        user.setAddress(request.getAddress());
-        user.setCity(request.getCity());
-        user.setState(request.getState());
-        user.setCountry(request.getCountry());
-        user.setSubscriptionPackage(pkg);
-        user.setNumDoctors(request.getNumDoctors());
+        user.setMobileNumber(request.getMobileNumber());
+        user.setUserType(request.getUserType());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setStatus(RegistrationStatus.PENDING);
         user.setRole(Role.ROLE_USER);
 
-        userRepository.save(user);
-        log.info("New user registered: {}", user.getEmail());
+        User savedUser = userRepository.save(user);
+
+        UserSubscription sub = new UserSubscription();
+        sub.setUser(savedUser);
+        sub.setSubscriptionPackage(pkg);
+        sub.setStartDate(LocalDate.now());
+        
+        LocalDate endDate = LocalDate.now();
+        if (pkg.getDurationType() == DurationType.SIX_MONTH) {
+            endDate = endDate.plusMonths(6);
+        } else if (pkg.getDurationType() == DurationType.ONE_YEAR) {
+            endDate = endDate.plusYears(1);
+        } else if (pkg.getDurationType() == DurationType.TWO_YEAR) {
+            endDate = endDate.plusYears(2);
+        }
+        sub.setEndDate(endDate);
+        sub.setAllowedDoctors(request.getAllowedDoctors() != null ? request.getAllowedDoctors() : pkg.getBaseDoctorLimit());
+        sub.setAllowedHospitals(request.getAllowedHospitals() != null ? request.getAllowedHospitals() : 1);
+        sub.setAllowedClinics(request.getAllowedClinics() != null ? request.getAllowedClinics() : 1);
+        sub.setUsedDoctors(0);
+        sub.setPaymentStatus(PaymentStatus.PENDING);
+        sub.setSubscriptionStatus(SubscriptionStatus.ACTIVE); // Will become functional once User is approved
+        userSubscriptionRepository.save(sub);
+
+        if (request.getUserType() == UserType.HOSPITAL) {
+            Hospital hospital = new Hospital();
+            hospital.setUser(savedUser);
+            hospital.setOwner(savedUser);
+            hospital.setHospitalName(request.getEntityName());
+            hospital.setHospitalCode(generateUniqueHospitalCode());
+            hospital.setAddressLine1(request.getAddressLine1());
+            hospital.setCity(request.getCity());
+            hospital.setState(request.getState());
+            hospital.setPincode(request.getPincode());
+            hospital.setEmail(request.getEmail());
+            hospital.setMobileNumber(request.getMobileNumber());
+            hospital.setMaxDoctorLimit(sub.getAllowedDoctors());
+            hospital.setActiveDoctorCount(0);
+            hospital.setStatus(EntityStatus.ACTIVE);
+            hospitalRepository.save(hospital);
+        } else {
+            Clinic clinic = new Clinic();
+            clinic.setUser(savedUser);
+            clinic.setOwner(savedUser);
+            clinic.setClinicName(request.getEntityName());
+            clinic.setClinicCode(generateUniqueClinicCode());
+            clinic.setAddressLine1(request.getAddressLine1());
+            clinic.setCity(request.getCity());
+            clinic.setState(request.getState());
+            clinic.setPincode(request.getPincode());
+            clinic.setEmail(request.getEmail());
+            clinic.setMobileNumber(request.getMobileNumber());
+            clinic.setMaxDoctorLimit(sub.getAllowedDoctors());
+            clinic.setActiveDoctorCount(0);
+            clinic.setStatus(EntityStatus.ACTIVE);
+            clinicRepository.save(clinic);
+        }
+
+
+        LoginCredential loginCred = new LoginCredential();
+        loginCred.setUser(savedUser);
+        loginCred.setUsername(savedUser.getEmail());
+        loginCred.setPasswordHash(savedUser.getPassword());
+        loginCred.setLoginStatus(LoginStatus.ACTIVE);
+        loginCredentialRepository.save(loginCred);
+
+        log.info("New user registered: {}", savedUser.getEmail());
 
         emailService.sendRegistrationNotificationToAdmin(
-                adminEmail, user.getFullName(), user.getClinicName(),
-                user.getEmail(), pkg.getName(), user.getNumDoctors()
+                adminEmail, savedUser.getFullName(), request.getEntityName(),
+                savedUser.getEmail(), pkg.getPackageName(), pkg.getBaseDoctorLimit()
         );
     }
 
@@ -119,32 +178,38 @@ public class AuthServiceImpl implements AuthService {
         if (user.getStatus() == RegistrationStatus.REJECTED) {
             throw new UnauthorizedException("Your account has been rejected.");
         }
-        if (user.getStatus() == RegistrationStatus.EXPIRED) {
-            throw new UnauthorizedException("Your subscription has expired.");
+        if (user.getStatus() == RegistrationStatus.EXPIRED || user.getStatus() == RegistrationStatus.INACTIVE) {
+            throw new UnauthorizedException("Your account is inactive or expired.");
         }
 
-        LocalDate curr = LocalDate.now();
-        LocalDate exp = user.getSubscriptionEnd();
-        if(curr.isAfter(exp)) {
+        List<UserSubscription> activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(user.getId(), SubscriptionStatus.ACTIVE);
+        boolean hasValidSub = false;
+        LocalDate today = LocalDate.now();
+
+        for (UserSubscription sub : activeSubs) {
+            if (today.isAfter(sub.getEndDate())) {
+                sub.setSubscriptionStatus(SubscriptionStatus.EXPIRED);
+                userSubscriptionRepository.save(sub);
+                log.info("Subscription {} expired for user {}", sub.getId(), user.getEmail());
+            } else {
+                hasValidSub = true;
+            }
+        }
+
+        if (!hasValidSub && !user.getRole().equals(Role.ROLE_ADMIN)) {
+
             user.setStatus(RegistrationStatus.EXPIRED);
             userRepository.save(user);
             loginSessionRepository.expireAllSessionsForUser(user);
             emailService.sendExpiryReminderEmail(user.getEmail(), user.getFullName());
-
-            log.info("User subscription expired: {}", user.getEmail());
-
             throw new UnauthorizedException("Your subscription has expired");
         }
 
-        SubscriptionPackage pkg = user.getSubscriptionPackage();
-        if (pkg != null && pkg.getDeviceLimit() == 1) {
-            loginSessionRepository.expireAllSessionsForUser(user);
-        } else {
-            List<LoginSession> activeSessions = loginSessionRepository.findByUserAndExpiredFalse(user);
-            if (pkg != null && activeSessions.size() >= pkg.getDeviceLimit()) {
-                loginSessionRepository.expireAllSessionsForUser(user);
-            }
-        }
+
+        loginCredentialRepository.findByUserId(user.getId()).ifPresent(cred -> {
+            cred.setLastLogin(LocalDateTime.now());
+            loginCredentialRepository.save(cred);
+        });
 
         String accessToken = jwtTokenProvider.generateAccessToken(user.getEmail());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getEmail());
@@ -196,10 +261,16 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException("Password reset token has expired");
         }
 
-        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        String encodedPassword = passwordEncoder.encode(request.getNewPassword());
+        user.setPassword(encodedPassword);
         user.setPasswordResetToken(null);
         user.setPasswordResetExpiry(null);
         userRepository.save(user);
+
+        loginCredentialRepository.findByUserId(user.getId()).ifPresent(cred -> {
+            cred.setPasswordHash(encodedPassword);
+            loginCredentialRepository.save(cred);
+        });
 
         loginSessionRepository.expireAllSessionsForUser(user);
         log.info("Password reset successful for: {}", user.getEmail());
@@ -226,14 +297,32 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private UserResponse mapToUserResponse(User user) {
-        UserResponse response = modelMapper.map(user, UserResponse.class);
-        response.setStatus(user.getStatus().name());
-        response.setRole(user.getRole().name());
-        if (user.getSubscriptionPackage() != null) {
-            response.setPackageName(user.getSubscriptionPackage().getName());
-            response.setPackageDoctorLimit(user.getSubscriptionPackage().getDoctorLimit());
-            response.setPackageDeviceLimit(user.getSubscriptionPackage().getDeviceLimit());
-        }
+        UserResponse response = new UserResponse();
+        response.setId(user.getId());
+        response.setFullName(user.getFullName());
+        response.setEmail(user.getEmail());
+        response.setMobileNumber(user.getMobileNumber());
+        response.setUserType(user.getUserType());
+        response.setStatus(user.getStatus());
+        response.setRole(user.getRole());
+        response.setRegistrationDate(user.getRegistrationDate());
+        response.setCreatedAt(user.getCreatedAt());
         return response;
+    }
+
+    private String generateUniqueHospitalCode() {
+        String code;
+        do {
+            code = "HOSP-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        } while (hospitalRepository.findByHospitalCode(code).isPresent());
+        return code;
+    }
+
+    private String generateUniqueClinicCode() {
+        String code;
+        do {
+            code = "CLIN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        } while (clinicRepository.findByClinicCode(code).isPresent());
+        return code;
     }
 }

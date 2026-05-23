@@ -8,8 +8,6 @@ import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.repository.PackageRepository;
 import com.antss_prescription.service.PackageService;
 import org.modelmapper.ModelMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +20,6 @@ import java.util.stream.Collectors;
 @Transactional
 public class PackageServiceImpl implements PackageService {
 
-
     private final PackageRepository packageRepository;
     private final ModelMapper modelMapper;
 
@@ -33,21 +30,22 @@ public class PackageServiceImpl implements PackageService {
 
     @Override
     public PackageResponse createPackage(CreatePackageRequest request) {
-        if (packageRepository.existsByName(request.getName())) {
-            throw new BusinessException("Package with name '" + request.getName() + "' already exists");
+        if (packageRepository.existsByPackageName(request.getPackageName())) {
+            throw new BusinessException("Package with name '" + request.getPackageName() + "' already exists");
         }
 
         SubscriptionPackage pkg = new SubscriptionPackage();
-        pkg.setName(request.getName());
-        pkg.setValidityDays(request.getValidityDays());
-        pkg.setDoctorLimit(request.getDoctorLimit());
-        pkg.setDeviceLimit(request.getDeviceLimit());
-        pkg.setPrice(request.getPrice());
+        pkg.setPackageName(request.getPackageName());
+        pkg.setDurationType(request.getDurationType());
+        pkg.setBaseDoctorLimit(request.getBaseDoctorLimit());
+        pkg.setPackagePrice(request.getPackagePrice());
+        pkg.setExtraDoctorPrice(request.getExtraDoctorPrice());
+        pkg.setFeatures(request.getFeatures());
         pkg.setActive(request.isActive());
 
         SubscriptionPackage saved = packageRepository.save(pkg);
-        log.info("Package created: {}", saved.getName());
-        return modelMapper.map(saved, PackageResponse.class);
+        log.info("Package created: {}", saved.getPackageName());
+        return mapToResponse(saved);
     }
 
     @Override
@@ -55,16 +53,17 @@ public class PackageServiceImpl implements PackageService {
         SubscriptionPackage pkg = packageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Package", id));
 
-        pkg.setName(request.getName());
-        pkg.setValidityDays(request.getValidityDays());
-        pkg.setDoctorLimit(request.getDoctorLimit());
-        pkg.setDeviceLimit(request.getDeviceLimit());
-        pkg.setPrice(request.getPrice());
+        pkg.setPackageName(request.getPackageName());
+        pkg.setDurationType(request.getDurationType());
+        pkg.setBaseDoctorLimit(request.getBaseDoctorLimit());
+        pkg.setPackagePrice(request.getPackagePrice());
+        pkg.setExtraDoctorPrice(request.getExtraDoctorPrice());
+        pkg.setFeatures(request.getFeatures());
         pkg.setActive(request.isActive());
 
         SubscriptionPackage saved = packageRepository.save(pkg);
-        log.info("Package updated: {}", saved.getName());
-        return modelMapper.map(saved, PackageResponse.class);
+        log.info("Package updated: {}", saved.getPackageName());
+        return mapToResponse(saved);
     }
 
     @Override
@@ -73,7 +72,7 @@ public class PackageServiceImpl implements PackageService {
                 .orElseThrow(() -> new ResourceNotFoundException("Package", id));
         pkg.setActive(false);
         packageRepository.save(pkg);
-        log.info("Package soft-deleted: {}", pkg.getName());
+        log.info("Package soft-deleted: {}", pkg.getPackageName());
     }
 
     @Override
@@ -81,7 +80,20 @@ public class PackageServiceImpl implements PackageService {
     public List<PackageResponse> getAllPackages() {
         return packageRepository.findAll()
                 .stream()
-                .map(pkg -> modelMapper.map(pkg, PackageResponse.class))
+                .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+    private PackageResponse mapToResponse(SubscriptionPackage pkg) {
+        PackageResponse res = new PackageResponse();
+        res.setId(pkg.getId());
+        res.setPackageName(pkg.getPackageName());
+        res.setDurationType(pkg.getDurationType());
+        res.setBaseDoctorLimit(pkg.getBaseDoctorLimit());
+        res.setPackagePrice(pkg.getPackagePrice());
+        res.setExtraDoctorPrice(pkg.getExtraDoctorPrice());
+        res.setFeatures(pkg.getFeatures());
+        res.setActive(pkg.isActive());
+        return res;
     }
 }

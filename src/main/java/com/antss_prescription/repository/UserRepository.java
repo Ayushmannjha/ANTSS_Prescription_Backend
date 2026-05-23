@@ -9,11 +9,12 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import java.util.UUID;
+
 @Repository
-public interface UserRepository extends JpaRepository<User, Long> {
+public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
     List<User> findByStatus(RegistrationStatus status);
-    List<User> findByStatusAndSubscriptionEndBefore(RegistrationStatus status, LocalDate date);
     Optional<User> findByPasswordResetToken(String token);
 }

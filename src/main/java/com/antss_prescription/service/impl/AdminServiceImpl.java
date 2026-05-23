@@ -2,24 +2,26 @@ package com.antss_prescription.service.impl;
 
 import com.antss_prescription.dto.request.ExtendValidityRequest;
 import com.antss_prescription.dto.request.ModifyPackageRequest;
+import com.antss_prescription.dto.response.DoctorAddonResponse;
 import com.antss_prescription.dto.response.UserResponse;
-import com.antss_prescription.entity.SubscriptionPackage;
-import com.antss_prescription.entity.User;
-import com.antss_prescription.enums.RegistrationStatus;
+import com.antss_prescription.entity.*;
+import com.antss_prescription.enums.*;
 import com.antss_prescription.exception.BusinessException;
 import com.antss_prescription.exception.ResourceNotFoundException;
-import com.antss_prescription.repository.LoginSessionRepository;
-import com.antss_prescription.repository.PackageRepository;
-import com.antss_prescription.repository.UserRepository;
+import com.antss_prescription.repository.*;
 import com.antss_prescription.service.AdminService;
 import com.antss_prescription.service.EmailService;
 import org.modelmapper.ModelMapper;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 
+import java.security.SecureRandom;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -27,23 +29,40 @@ import java.util.stream.Collectors;
 @Transactional
 public class AdminServiceImpl implements AdminService {
 
-
     private final UserRepository userRepository;
     private final PackageRepository packageRepository;
     private final LoginSessionRepository loginSessionRepository;
+    private final UserSubscriptionRepository userSubscriptionRepository;
+    private final HospitalRepository hospitalRepository;
+    private final ClinicRepository clinicRepository;
+    private final DoctorAddonRepository doctorAddonRepository;
     private final EmailService emailService;
     private final ModelMapper modelMapper;
+    private final PasswordEncoder passwordEncoder;
+    private final LoginCredentialRepository loginCredentialRepository;
 
     public AdminServiceImpl(UserRepository userRepository,
                             PackageRepository packageRepository,
                             LoginSessionRepository loginSessionRepository,
+                            UserSubscriptionRepository userSubscriptionRepository,
+                            HospitalRepository hospitalRepository,
+                            ClinicRepository clinicRepository,
+                            DoctorAddonRepository doctorAddonRepository,
                             EmailService emailService,
-                            ModelMapper modelMapper) {
+                            ModelMapper modelMapper,
+                            PasswordEncoder passwordEncoder,
+                            LoginCredentialRepository loginCredentialRepository) {
         this.userRepository = userRepository;
         this.packageRepository = packageRepository;
         this.loginSessionRepository = loginSessionRepository;
+        this.userSubscriptionRepository = userSubscriptionRepository;
+        this.hospitalRepository = hospitalRepository;
+        this.clinicRepository = clinicRepository;
+        this.doctorAddonRepository = doctorAddonRepository;
         this.emailService = emailService;
         this.modelMapper = modelMapper;
+        this.passwordEncoder = passwordEncoder;
+        this.loginCredentialRepository = loginCredentialRepository;
     }
 
     @Override
@@ -55,30 +74,59 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public UserResponse approveUser(Long userId) {
+    public UserResponse approveUser(UUID userId) {
         User user = getUserOrThrow(userId);
 
         if (user.getStatus() != RegistrationStatus.PENDING) {
             throw new BusinessException("Only PENDING registrations can be approved");
         }
 
-        SubscriptionPackage pkg = user.getSubscriptionPackage();
-        if (pkg == null) {
-            throw new BusinessException("User has no package assigned");
-        }
+        String plainPassword = generateSecurePassword(12);
+        String encodedPassword = passwordEncoder.encode(plainPassword);
 
         user.setStatus(RegistrationStatus.APPROVED);
-        user.setSubscriptionStart(LocalDate.now());
-        user.setSubscriptionEnd(LocalDate.now().plusDays(pkg.getValidityDays()));
+        user.setApprovedAt(LocalDateTime.now());
+        user.setPassword(encodedPassword);
         User saved = userRepository.save(user);
 
-        emailService.sendApprovalEmail(user.getEmail(), user.getFullName());
-        log.info("User approved: {}", user.getEmail());
+        LoginCredential credential = loginCredentialRepository.findByUserId(userId)
+                .orElse(new LoginCredential());
+        credential.setUser(saved);
+        credential.setUsername(saved.getEmail());
+        credential.setPasswordHash(encodedPassword);
+        loginCredentialRepository.save(credential);
+
+        LocalDate subEndDate = LocalDate.now().plusYears(1); // fallback
+        List<UserSubscription> subscriptions = userSubscriptionRepository.findByUserId(userId);
+        if (!subscriptions.isEmpty()) {
+            UserSubscription sub = subscriptions.get(0);
+            sub.setStartDate(LocalDate.now());
+
+            LocalDate endDate = LocalDate.now();
+            SubscriptionPackage pkg = sub.getSubscriptionPackage();
+            if (pkg.getDurationType() == DurationType.SIX_MONTH) {
+                endDate = endDate.plusMonths(6);
+            } else if (pkg.getDurationType() == DurationType.ONE_YEAR) {
+                endDate = endDate.plusYears(1);
+            } else if (pkg.getDurationType() == DurationType.TWO_YEAR) {
+                endDate = endDate.plusYears(2);
+            }
+            sub.setEndDate(endDate);
+            sub.setPaymentStatus(PaymentStatus.PAID);
+            sub.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+            userSubscriptionRepository.save(sub);
+            subEndDate = endDate;
+
+            updateEntityMaxDoctorLimit(user, sub.getAllowedDoctors());
+        }
+
+        emailService.sendApprovalEmail(user.getEmail(), user.getFullName(), plainPassword);
+        log.info("User approved and credentials emailed: {}", user.getEmail());
         return mapToUserResponse(saved);
     }
 
     @Override
-    public UserResponse rejectUser(Long userId) {
+    public UserResponse rejectUser(UUID userId) {
         User user = getUserOrThrow(userId);
 
         if (user.getStatus() != RegistrationStatus.PENDING) {
@@ -94,7 +142,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public UserResponse modifyUserPackage(Long userId, ModifyPackageRequest request) {
+    public UserResponse modifyUserPackage(UUID userId, ModifyPackageRequest request) {
         User user = getUserOrThrow(userId);
 
         SubscriptionPackage newPkg = packageRepository.findById(request.getPackageId())
@@ -104,40 +152,60 @@ public class AdminServiceImpl implements AdminService {
             throw new BusinessException("Selected package is not active");
         }
 
-        user.setSubscriptionPackage(newPkg);
-        if (user.getStatus() == RegistrationStatus.APPROVED && user.getSubscriptionStart() != null) {
-            user.setSubscriptionEnd(user.getSubscriptionStart().plusDays(newPkg.getValidityDays()));
+        List<UserSubscription> activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(userId, SubscriptionStatus.ACTIVE);
+        if (activeSubs.isEmpty()) {
+            throw new BusinessException("User has no active subscription to modify");
         }
-        User saved = userRepository.save(user);
+
+        UserSubscription sub = activeSubs.get(0);
+        sub.setSubscriptionPackage(newPkg);
+        sub.setAllowedDoctors(newPkg.getBaseDoctorLimit()); // Reset allowed doctor count to new package base limit
+        
+        LocalDate endDate = sub.getStartDate();
+        if (newPkg.getDurationType() == DurationType.SIX_MONTH) {
+            endDate = endDate.plusMonths(6);
+        } else if (newPkg.getDurationType() == DurationType.ONE_YEAR) {
+            endDate = endDate.plusYears(1);
+        } else if (newPkg.getDurationType() == DurationType.TWO_YEAR) {
+            endDate = endDate.plusYears(2);
+        }
+        sub.setEndDate(endDate);
+        userSubscriptionRepository.save(sub);
+
+        updateEntityMaxDoctorLimit(user, sub.getAllowedDoctors());
+
         log.info("Package modified for user: {}", user.getEmail());
-        return mapToUserResponse(saved);
+        return mapToUserResponse(user);
     }
 
     @Override
-    public UserResponse extendValidity(Long userId, ExtendValidityRequest request) {
+    public UserResponse extendValidity(UUID userId, ExtendValidityRequest request) {
         User user = getUserOrThrow(userId);
 
-        if (user.getSubscriptionEnd() == null) {
+        List<UserSubscription> activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(userId, SubscriptionStatus.ACTIVE);
+        if (activeSubs.isEmpty()) {
             throw new BusinessException("User does not have an active subscription to extend");
         }
 
-        LocalDate currentEnd = user.getSubscriptionEnd();
+        UserSubscription sub = activeSubs.get(0);
+        LocalDate currentEnd = sub.getEndDate();
         LocalDate base = currentEnd.isBefore(LocalDate.now()) ? LocalDate.now() : currentEnd;
-        user.setSubscriptionEnd(base.plusDays(request.getDays()));
+        sub.setEndDate(base.plusDays(request.getDays()));
+        userSubscriptionRepository.save(sub);
 
         if (user.getStatus() == RegistrationStatus.EXPIRED) {
             user.setStatus(RegistrationStatus.APPROVED);
+            userRepository.save(user);
         }
 
-        User saved = userRepository.save(user);
         log.info("Validity extended for user: {} by {} days", user.getEmail(), request.getDays());
-        return mapToUserResponse(saved);
+        return mapToUserResponse(user);
     }
 
     @Override
-    public UserResponse blockUser(Long userId) {
+    public UserResponse blockUser(UUID userId) {
         User user = getUserOrThrow(userId);
-        user.setStatus(RegistrationStatus.REJECTED);
+        user.setStatus(RegistrationStatus.INACTIVE);
         loginSessionRepository.expireAllSessionsForUser(user);
         User saved = userRepository.save(user);
         log.info("User blocked: {}", user.getEmail());
@@ -145,7 +213,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public UserResponse unblockUser(Long userId) {
+    public UserResponse unblockUser(UUID userId) {
         User user = getUserOrThrow(userId);
         user.setStatus(RegistrationStatus.APPROVED);
         User saved = userRepository.save(user);
@@ -153,20 +221,104 @@ public class AdminServiceImpl implements AdminService {
         return mapToUserResponse(saved);
     }
 
-    private User getUserOrThrow(Long userId) {
+    @Override
+    public List<DoctorAddonResponse> getPendingAddons() {
+        return doctorAddonRepository.findByApprovalStatus(AddonApprovalStatus.PENDING)
+                .stream()
+                .map(this::mapToAddonResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public DoctorAddonResponse approveDoctorAddon(Long addonId, UUID adminUserId) {
+        DoctorAddon addon = doctorAddonRepository.findById(addonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor Addon", addonId));
+
+        if (addon.getApprovalStatus() != AddonApprovalStatus.PENDING) {
+            throw new BusinessException("Addon request is already processed");
+        }
+
+        User admin = userRepository.findById(adminUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Admin", adminUserId));
+
+        addon.setApprovalStatus(AddonApprovalStatus.APPROVED);
+        addon.setPaymentStatus(PaymentStatus.PAID);
+        addon.setApprovedBy(admin);
+        addon.setApprovedAt(LocalDateTime.now());
+        DoctorAddon savedAddon = doctorAddonRepository.save(addon);
+
+        UserSubscription sub = addon.getUserSubscription();
+        sub.setAllowedDoctors(sub.getAllowedDoctors() + addon.getAdditionalDoctors());
+        userSubscriptionRepository.save(sub);
+
+        updateEntityMaxDoctorLimit(sub.getUser(), sub.getAllowedDoctors());
+
+        log.info("Doctor addon request approved by admin {}: subscription {} increased by {} doctors", 
+                adminUserId, sub.getId(), addon.getAdditionalDoctors());
+        return mapToAddonResponse(savedAddon);
+    }
+
+    @Override
+    public DoctorAddonResponse rejectDoctorAddon(Long addonId, UUID adminUserId) {
+        DoctorAddon addon = doctorAddonRepository.findById(addonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor Addon", addonId));
+
+        if (addon.getApprovalStatus() != AddonApprovalStatus.PENDING) {
+            throw new BusinessException("Addon request is already processed");
+        }
+
+        User admin = userRepository.findById(adminUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Admin", adminUserId));
+
+        addon.setApprovalStatus(AddonApprovalStatus.REJECTED);
+        addon.setApprovedBy(admin);
+        addon.setApprovedAt(LocalDateTime.now());
+        DoctorAddon savedAddon = doctorAddonRepository.save(addon);
+
+        log.info("Doctor addon request rejected by admin {}", adminUserId);
+        return mapToAddonResponse(savedAddon);
+    }
+
+    private User getUserOrThrow(UUID userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
     }
 
     private UserResponse mapToUserResponse(User user) {
-        UserResponse response = modelMapper.map(user, UserResponse.class);
-        response.setStatus(user.getStatus().name());
-        response.setRole(user.getRole().name());
-        if (user.getSubscriptionPackage() != null) {
-            response.setPackageName(user.getSubscriptionPackage().getName());
-            response.setPackageDoctorLimit(user.getSubscriptionPackage().getDoctorLimit());
-            response.setPackageDeviceLimit(user.getSubscriptionPackage().getDeviceLimit());
+        return modelMapper.map(user, UserResponse.class);
+    }
+
+    private DoctorAddonResponse mapToAddonResponse(DoctorAddon addon) {
+        DoctorAddonResponse res = modelMapper.map(addon, DoctorAddonResponse.class);
+        if (addon.getApprovedBy() != null) {
+            res.setApprovedByUserId(addon.getApprovedBy().getId());
         }
-        return response;
+        return res;
+    }
+
+    private String generateSecurePassword(int length) {
+        final String CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$!";
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            sb.append(CHARS.charAt(random.nextInt(CHARS.length())));
+        }
+        return sb.toString();
+    }
+
+    private void updateEntityMaxDoctorLimit(User user, int newLimit) {
+        if (user.getUserType() == UserType.HOSPITAL) {
+            List<Hospital> hospitals = hospitalRepository.findByUserId(user.getId());
+            for (Hospital h : hospitals) {
+                h.setMaxDoctorLimit(newLimit);
+                hospitalRepository.save(h);
+            }
+        } else {
+            List<Clinic> clinics = clinicRepository.findByUserId(user.getId());
+            for (Clinic c : clinics) {
+                c.setMaxDoctorLimit(newLimit);
+                clinicRepository.save(c);
+            }
+        }
     }
 }
