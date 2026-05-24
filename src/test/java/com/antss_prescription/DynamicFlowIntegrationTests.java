@@ -82,8 +82,8 @@ public class DynamicFlowIntegrationTests {
         registerReq.setState("State");
         registerReq.setPincode("123456");
         registerReq.setPackageId(goldPackage.getId());
-        registerReq.setPassword("Password123");
-        registerReq.setConfirmPassword("Password123");
+      //  registerReq.setPassword("Password123");
+      //  registerReq.setConfirmPassword("Password123");
         registerReq.setAllowedHospitals(2); // Set custom limit to 2
         registerReq.setAllowedClinics(0);
         registerReq.setAllowedDoctors(3); // Set custom limit to 3

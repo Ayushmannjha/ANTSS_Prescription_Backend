@@ -86,7 +86,7 @@ public class ClinicServiceImpl implements ClinicService {
         clinicUser.setFullName(request.getClinicName());
         clinicUser.setEmail(request.getEmail());
         clinicUser.setMobileNumber(request.getMobileNumber());
-        clinicUser.setPassword(passwordEncoder.encode(plainPassword));
+       // clinicUser.setPassword(passwordEncoder.encode(plainPassword));
         clinicUser.setUserType(UserType.CLINIC);
         clinicUser.setStatus(RegistrationStatus.APPROVED);
         clinicUser.setRole(Role.ROLE_USER);

@@ -87,7 +87,7 @@ public class HospitalServiceImpl implements HospitalService {
         hospitalUser.setFullName(request.getHospitalName());
         hospitalUser.setEmail(request.getEmail());
         hospitalUser.setMobileNumber(request.getMobileNumber());
-        hospitalUser.setPassword(passwordEncoder.encode(plainPassword));
+      //  hospitalUser.setPassword(passwordEncoder.encode(plainPassword));
         hospitalUser.setUserType(UserType.HOSPITAL);
         hospitalUser.setStatus(RegistrationStatus.APPROVED);
         hospitalUser.setRole(Role.ROLE_USER);

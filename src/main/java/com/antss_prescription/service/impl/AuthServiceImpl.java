@@ -155,12 +155,12 @@ public class AuthServiceImpl implements AuthService {
         }
 
 
-        LoginCredential loginCred = new LoginCredential();
-        loginCred.setUser(savedUser);
-        loginCred.setUsername(savedUser.getEmail());
-        loginCred.setPasswordHash(savedUser.getPassword());
-        loginCred.setLoginStatus(LoginStatus.ACTIVE);
-        loginCredentialRepository.save(loginCred);
+//        LoginCredential loginCred = new LoginCredential();
+//        loginCred.setUser(savedUser);
+//        loginCred.setUsername(savedUser.getEmail());
+//        loginCred.setPasswordHash(savedUser.getPassword());
+//        loginCred.setLoginStatus(LoginStatus.ACTIVE);
+//        loginCredentialRepository.save(loginCred);
 
         log.info("New user registered: {}", savedUser.getEmail());
 
@@ -182,7 +182,11 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        LoginCredential credential = loginCredentialRepository.findByUserId(user.getId()).orElseThrow(
+                ()-> new BusinessException("login credentials not found for the user, please contact admin")
+        );
+
+        if (!passwordEncoder.matches(request.getPassword(), credential.getPasswordHash())) {
             throw new UnauthorizedException("Invalid email or password");
         }
 
@@ -271,12 +275,16 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByPasswordResetToken(request.getToken())
                 .orElseThrow(() -> new BusinessException("Invalid or expired password reset token"));
 
+        LoginCredential credential = loginCredentialRepository.findByUserId(user.getId()).orElseThrow(
+                () -> new BusinessException(" Login credentials not found please contact the admin")
+        );
+
         if (user.getPasswordResetExpiry() == null || user.getPasswordResetExpiry().isBefore(LocalDateTime.now())) {
             throw new BusinessException("Password reset token has expired");
         }
 
         String encodedPassword = passwordEncoder.encode(request.getNewPassword());
-        user.setPassword(encodedPassword);
+       // user.setPassword(encodedPassword);
         user.setPasswordResetToken(null);
         user.setPasswordResetExpiry(null);
         userRepository.save(user);

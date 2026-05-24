@@ -86,7 +86,7 @@ public class DataInitializer implements CommandLineRunner {
             admin.setEmail(adminEmail);
             admin.setMobileNumber("0000000000");
             admin.setUserType(UserType.HOSPITAL);
-            admin.setPassword(passwordEncoder.encode(adminDefaultPassword));
+           // admin.setPassword(passwordEncoder.encode(adminDefaultPassword));
             admin.setStatus(RegistrationStatus.APPROVED);
             admin.setRole(Role.ROLE_ADMIN);
 
@@ -95,7 +95,7 @@ public class DataInitializer implements CommandLineRunner {
             LoginCredential adminCred = new LoginCredential();
             adminCred.setUser(savedAdmin);
             adminCred.setUsername(adminEmail);
-            adminCred.setPasswordHash(savedAdmin.getPassword());
+            adminCred.setPasswordHash(passwordEncoder.encode(adminDefaultPassword));
             adminCred.setLoginStatus(LoginStatus.ACTIVE);
             loginCredentialRepository.save(adminCred);
 

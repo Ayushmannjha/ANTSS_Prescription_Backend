@@ -132,7 +132,7 @@ public class DoctorServiceImpl implements DoctorService {
         doctorUser.setFullName(request.getDoctorName());
         doctorUser.setEmail(request.getEmail());
         doctorUser.setMobileNumber(request.getMobileNumber());
-        doctorUser.setPassword(passwordEncoder.encode(plainPassword));
+      //  doctorUser.setPassword(passwordEncoder.encode(plainPassword));
         doctorUser.setUserType(UserType.DOCTOR);
         doctorUser.setStatus(RegistrationStatus.APPROVED);
         doctorUser.setRole(Role.ROLE_USER);

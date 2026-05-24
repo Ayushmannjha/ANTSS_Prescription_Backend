@@ -86,7 +86,7 @@ public class AdminServiceImpl implements AdminService {
 
         user.setStatus(RegistrationStatus.APPROVED);
         user.setApprovedAt(LocalDateTime.now());
-        user.setPassword(encodedPassword);
+      //  user.setPassword(encodedPassword);
         User saved = userRepository.save(user);
 
         LoginCredential credential = loginCredentialRepository.findByUserId(userId)
