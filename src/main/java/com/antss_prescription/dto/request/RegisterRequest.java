@@ -31,12 +31,6 @@ public class RegisterRequest {
     @NotNull
     private Long packageId;
 
-    @NotBlank
-    private String password;
-
-    @NotBlank
-    private String confirmPassword;
-
     private Integer allowedHospitals;
     private Integer allowedClinics;
     private Integer allowedDoctors;

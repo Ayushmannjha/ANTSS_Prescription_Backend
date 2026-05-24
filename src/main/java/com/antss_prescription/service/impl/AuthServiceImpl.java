@@ -73,9 +73,9 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void register(RegisterRequest request) {
-        if (!request.getPassword().equals(request.getConfirmPassword())) {
-            throw new BusinessException("Passwords do not match");
-        }
+//        if (!request.getPassword().equals(request.getConfirmPassword())) {
+//            throw new BusinessException("Passwords do not match");
+//        }
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BusinessException("Email already registered: " + request.getEmail());
         }
@@ -92,7 +92,7 @@ public class AuthServiceImpl implements AuthService {
         user.setEmail(request.getEmail());
         user.setMobileNumber(request.getMobileNumber());
         user.setUserType(request.getUserType());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
+       // user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setStatus(RegistrationStatus.PENDING);
         user.setRole(Role.ROLE_USER);
 
