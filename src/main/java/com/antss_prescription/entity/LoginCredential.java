@@ -21,7 +21,7 @@ public class LoginCredential {
     @Column(nullable = false, unique = true)
     private String username;
 
-    @Column(nullable = false)
+  //  @Column(nullable = false)
     private String passwordHash;
 
     private LocalDateTime lastLogin;
