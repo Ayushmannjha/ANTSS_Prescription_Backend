@@ -16,4 +16,13 @@ public interface HospitalRepository extends JpaRepository<Hospital, Long> {
     List<Hospital> findByUserId(UUID userId);
     List<Hospital> findByOwnerId(UUID ownerId);
     List<Hospital> findByUserIdOrOwnerId(UUID userId, UUID ownerId);
+    
+    /** All hospitals where this user is the owner. */
+    List<Hospital> findByOwner(User owner);
+ 
+    /** Convenience alias matching the field name used in the service. */
+    default List<Hospital> findByOwnerUser(User user) {
+        return findByOwner(user);
+    }
+ 
 }
