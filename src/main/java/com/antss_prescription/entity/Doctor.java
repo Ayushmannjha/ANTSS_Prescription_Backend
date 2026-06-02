@@ -31,7 +31,7 @@ public class Doctor {
     @Column(unique = true)
     private String email;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = true, unique = true)
     private String hfrId;
 
     @Column(nullable = false, unique = true)

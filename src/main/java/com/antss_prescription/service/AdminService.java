@@ -21,4 +21,5 @@ public interface AdminService {
     List<DoctorAddonResponse> getPendingAddons();
     DoctorAddonResponse approveDoctorAddon(Long addonId, UUID adminUserId);
     DoctorAddonResponse rejectDoctorAddon(Long addonId, UUID adminUserId);
+    
 }
