@@ -13,4 +13,7 @@ public class AddDoctorAddonRequest {
     @NotNull
     @Min(1)
     private Integer additionalDoctors;
+    
+    
+    private Long entityId;
 }

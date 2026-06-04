@@ -82,6 +82,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         addon.setEndDate(sub.getEndDate());
         addon.setPaymentStatus(PaymentStatus.PENDING);
         addon.setApprovalStatus(AddonApprovalStatus.PENDING);
+        sub.setEntityId(request.getEntityId());
+        userSubscriptionRepository.save(sub);
 
         DoctorAddon saved = doctorAddonRepository.save(addon);
         log.info("Addon doctor request created: subscription {}, additional docs {}", sub.getId(), request.getAdditionalDoctors());

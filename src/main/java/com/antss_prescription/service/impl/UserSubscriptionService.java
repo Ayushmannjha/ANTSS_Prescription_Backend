@@ -13,6 +13,7 @@ import com.antss_prescription.dto.request.UserSubscriptionSummaryDto;
 import com.antss_prescription.dto.request.UserSubscriptionSummaryDto.DoctorAddonDto;
 import com.antss_prescription.dto.request.UserSubscriptionSummaryDto.DoctorAllocationDto;
 import com.antss_prescription.dto.request.UserSubscriptionSummaryDto.FacilityDto;
+import com.antss_prescription.dto.response.UserBasicDto;
 import com.antss_prescription.entity.Clinic;
 import com.antss_prescription.entity.Doctor;
 import com.antss_prescription.entity.DoctorAddon;
@@ -504,4 +505,36 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 		// TODO Auto-generated method stub
 		return 0;
 	}
+
+	@Override
+	public List<UserBasicDto> getAllUsers() {
+	    return userRepository.findAll()
+	            .stream()
+	            .map(user -> {
+	                UserBasicDto.UserBasicDtoBuilder dto = UserBasicDto.builder()
+	                        .userId(user.getId())
+	                        .fullName(user.getFullName())
+	                        .email(user.getEmail())
+	                        .role(user.getRole().name());
+
+	                subscriptionRepository.findActiveByUserId(user.getId())
+	                        .ifPresent(sub -> dto
+	                                .subscriptionId(sub.getId())
+	                                .packageName(sub.getSubscriptionPackage().getPackageName())
+	                                .startDate(sub.getStartDate())
+	                                .endDate(sub.getEndDate())
+	                                .daysRemaining(ChronoUnit.DAYS.between(LocalDate.now(), sub.getEndDate()))
+	                                .subscriptionStatus(sub.getSubscriptionStatus())
+	                                .paymentStatus(sub.getPaymentStatus())
+	                                .allowedDoctors(sub.getAllowedDoctors())
+	                                .usedDoctors(sub.getUsedDoctors())
+	                                .allowedHospitals(sub.getAllowedHospitals())
+	                                .allowedClinics(sub.getAllowedClinics())
+	                        );
+
+	                return dto.build();
+	            })
+	            .collect(Collectors.toList());
+	}
+
 }

@@ -1,28 +1,48 @@
 package com.antss_prescription.service.impl;
 
-import com.antss_prescription.dto.request.ExtendValidityRequest;
-import com.antss_prescription.dto.request.ModifyPackageRequest;
-import com.antss_prescription.dto.response.DoctorAddonResponse;
-import com.antss_prescription.dto.response.UserResponse;
-import com.antss_prescription.entity.*;
-import com.antss_prescription.enums.*;
-import com.antss_prescription.exception.BusinessException;
-import com.antss_prescription.exception.ResourceNotFoundException;
-import com.antss_prescription.repository.*;
-import com.antss_prescription.service.AdminService;
-import com.antss_prescription.service.EmailService;
-import org.modelmapper.ModelMapper;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import lombok.extern.slf4j.Slf4j;
-
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import org.modelmapper.ModelMapper;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.antss_prescription.dto.request.ExtendValidityRequest;
+import com.antss_prescription.dto.request.ModifyPackageRequest;
+import com.antss_prescription.dto.response.DoctorAddonResponse;
+import com.antss_prescription.dto.response.UserResponse;
+import com.antss_prescription.entity.Clinic;
+import com.antss_prescription.entity.DoctorAddon;
+import com.antss_prescription.entity.Hospital;
+import com.antss_prescription.entity.LoginCredential;
+import com.antss_prescription.entity.SubscriptionPackage;
+import com.antss_prescription.entity.User;
+import com.antss_prescription.entity.UserSubscription;
+import com.antss_prescription.enums.AddonApprovalStatus;
+import com.antss_prescription.enums.DurationType;
+import com.antss_prescription.enums.PaymentStatus;
+import com.antss_prescription.enums.RegistrationStatus;
+import com.antss_prescription.enums.SubscriptionStatus;
+import com.antss_prescription.enums.UserType;
+import com.antss_prescription.exception.BusinessException;
+import com.antss_prescription.exception.ResourceNotFoundException;
+import com.antss_prescription.repository.ClinicRepository;
+import com.antss_prescription.repository.DoctorAddonRepository;
+import com.antss_prescription.repository.HospitalRepository;
+import com.antss_prescription.repository.LoginCredentialRepository;
+import com.antss_prescription.repository.LoginSessionRepository;
+import com.antss_prescription.repository.PackageRepository;
+import com.antss_prescription.repository.UserRepository;
+import com.antss_prescription.repository.UserSubscriptionRepository;
+import com.antss_prescription.service.AdminService;
+import com.antss_prescription.service.EmailService;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -40,7 +60,7 @@ public class AdminServiceImpl implements AdminService {
     private final ModelMapper modelMapper;
     private final PasswordEncoder passwordEncoder;
     private final LoginCredentialRepository loginCredentialRepository;
-
+    
     public AdminServiceImpl(UserRepository userRepository,
                             PackageRepository packageRepository,
                             LoginSessionRepository loginSessionRepository,
@@ -223,10 +243,56 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public List<DoctorAddonResponse> getPendingAddons() {
-        return doctorAddonRepository.findByApprovalStatus(AddonApprovalStatus.PENDING)
-                .stream()
-                .map(this::mapToAddonResponse)
-                .collect(Collectors.toList());
+    	List<DoctorAddon> addons =
+    		    doctorAddonRepository.findByApprovalStatus(AddonApprovalStatus.PENDING);
+    	
+    	List<DoctorAddonResponse> responses = addons.stream()
+    	        .map(this::mapToAddonResponse)
+    	        .collect(Collectors.toList());
+    	
+    	for(DoctorAddonResponse addon:responses) {
+    		User user  =(userSubscriptionRepository.findById(addon.getUserSubscriptionId())).get().getUser();
+    	UserSubscription usersubscription=	userSubscriptionRepository.findById(addon.getUserSubscriptionId()).get();
+    	Clinic clinic = clinicRepository.findById(usersubscription.getEntityId()).orElse(null);
+    	Hospital hospital = hospitalRepository.findById(usersubscription.getEntityId()).orElse(null);
+    	addon.setUsername(user.getFullName());
+    		addon.setUserEmail(user.getEmail());
+    		addon.setEntityName(
+    			    clinic != null
+    			        ? clinic.getClinicName()
+    			        : hospital != null
+    			            ? hospital.getHospitalName()
+    			            : null
+    			);
+    		addon.setState(clinic != null
+    			        ? clinic.getState()
+    			        : hospital != null
+    			            ? hospital.getState()
+    			            : null);
+    		addon.setCity(clinic != null
+    			        ? clinic.getCity()
+    			        : hospital != null
+    			            ? hospital.getCity()
+    			            : null);
+    		addon.setEntityType(
+    			    clinic != null
+    			        ? "CLINIC"
+    			        : hospital != null
+    			            ? "HOSPITAL"
+    			            : null
+    			);
+    		addon.setCity(clinic != null
+			        ? clinic.getAddressLine1()
+			        : hospital != null
+			            ? hospital.getAddressLine1()
+			            : null);
+    		
+    	}
+    	
+	
+
+    	
+    	return responses;
     }
 
     @Override

@@ -24,7 +24,7 @@ public class CreateDoctorRequest {
 
     private String mobileNumber;
 
-    @NotBlank
+    //@NotBlank
     private String registrationNumber;
 
     private String signatureUrl;

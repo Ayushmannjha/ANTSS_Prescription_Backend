@@ -1,5 +1,6 @@
 package com.antss_prescription.controller;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.antss_prescription.dto.request.UserSubscriptionSummaryDto;
+import com.antss_prescription.dto.response.UserBasicDto;
 import com.antss_prescription.service.UserSubscriptionService;
 
 import lombok.RequiredArgsConstructor;
@@ -35,7 +37,7 @@ public class UserSubscriptionController {
     @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
     public ResponseEntity<UserSubscriptionSummaryDto> getSubscriptionSummary(
             @PathVariable UUID userId) {
-
+System.out.println("====request comes======");
         UserSubscriptionSummaryDto summary =
                 subscriptionService.getUserSubscriptionSummary(userId);
         return ResponseEntity.ok(summary);
@@ -62,5 +64,10 @@ public class UserSubscriptionController {
     @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
     public ResponseEntity<Integer> getRemainingDoctorSlots(@PathVariable UUID userId) {
         return ResponseEntity.ok(subscriptionService.getRemainingDoctorSlots(userId));
+    }
+    @GetMapping("/get-all-users")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<UserBasicDto>> getAllUsers() {
+        return ResponseEntity.ok(subscriptionService.getAllUsers());
     }
 }

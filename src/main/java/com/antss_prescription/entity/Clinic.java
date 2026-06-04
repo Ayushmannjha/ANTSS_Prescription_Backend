@@ -27,7 +27,7 @@ public class Clinic {
     @Column(nullable = false, unique = true)
     private String clinicCode;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = true, unique = true)
     private String registrationNumber;
 
     private String addressLine1;

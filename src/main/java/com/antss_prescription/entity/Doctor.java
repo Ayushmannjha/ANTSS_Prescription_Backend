@@ -40,7 +40,7 @@ public class Doctor {
     @Column(nullable = false, unique = true)
     private String registrationNumber;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = false)
     private String signatureUrl;
 
     @ManyToOne(fetch = FetchType.LAZY)

@@ -37,6 +37,7 @@ public class SubscriptionController {
     @Operation(summary = "Request additional doctor licenses (addon)")
     public ResponseEntity<ApiResponse<DoctorAddonResponse>> requestAddonDoctors(@Valid @RequestBody AddDoctorAddonRequest request) {
         UUID userId = getCurrentUserId();
+        System.out.println("===doctor addons request==="+request);
         DoctorAddonResponse response = subscriptionService.requestAddonDoctors(request, userId);
         return ResponseEntity.ok(ApiResponse.success("Doctor addon requested successfully", response));
     }

@@ -71,11 +71,11 @@ public class AuthServiceImpl implements AuthService {
         this.emailService = emailService;
     }
 
-    @Override
-    public void register(RegisterRequest request) {
-//        if (!request.getPassword().equals(request.getConfirmPassword())) {
-//            throw new BusinessException("Passwords do not match");
-//        }
+  @Override
+public void register(RegisterRequest request) {
+
+    try {
+
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BusinessException("Email already registered: " + request.getEmail());
         }
@@ -92,18 +92,20 @@ public class AuthServiceImpl implements AuthService {
         user.setEmail(request.getEmail());
         user.setMobileNumber(request.getMobileNumber());
         user.setUserType(request.getUserType());
-       // user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setStatus(RegistrationStatus.PENDING);
         user.setRole(Role.ROLE_USER);
 
         User savedUser = userRepository.save(user);
 
+        log.info("User saved successfully. UserId={}", savedUser.getId());
+
         UserSubscription sub = new UserSubscription();
         sub.setUser(savedUser);
         sub.setSubscriptionPackage(pkg);
         sub.setStartDate(LocalDate.now());
-        
+
         LocalDate endDate = LocalDate.now();
+
         if (pkg.getDurationType() == DurationType.SIX_MONTH) {
             endDate = endDate.plusMonths(6);
         } else if (pkg.getDurationType() == DurationType.ONE_YEAR) {
@@ -111,16 +113,33 @@ public class AuthServiceImpl implements AuthService {
         } else if (pkg.getDurationType() == DurationType.TWO_YEAR) {
             endDate = endDate.plusYears(2);
         }
+
         sub.setEndDate(endDate);
-        sub.setAllowedDoctors(request.getAllowedDoctors() != null ? request.getAllowedDoctors() : pkg.getBaseDoctorLimit());
-        sub.setAllowedHospitals(request.getAllowedHospitals() != null ? request.getAllowedHospitals() : 1);
-        sub.setAllowedClinics(request.getAllowedClinics() != null ? request.getAllowedClinics() : 1);
+        sub.setAllowedDoctors(
+                request.getAllowedDoctors() != null
+                        ? request.getAllowedDoctors()
+                        : pkg.getBaseDoctorLimit());
+
+        sub.setAllowedHospitals(
+                request.getAllowedHospitals() != null
+                        ? request.getAllowedHospitals()
+                        : 1);
+
+        sub.setAllowedClinics(
+                request.getAllowedClinics() != null
+                        ? request.getAllowedClinics()
+                        : 1);
+
         sub.setUsedDoctors(0);
         sub.setPaymentStatus(PaymentStatus.PENDING);
-        sub.setSubscriptionStatus(SubscriptionStatus.ACTIVE); // Will become functional once User is approved
+        sub.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+
         userSubscriptionRepository.save(sub);
 
+        log.info("Subscription saved successfully");
+
         if (request.getUserType() == UserType.HOSPITAL) {
+
             Hospital hospital = new Hospital();
             hospital.setUser(savedUser);
             hospital.setOwner(savedUser);
@@ -135,13 +154,25 @@ public class AuthServiceImpl implements AuthService {
             hospital.setMaxDoctorLimit(sub.getAllowedDoctors());
             hospital.setActiveDoctorCount(0);
             hospital.setStatus(EntityStatus.ACTIVE);
+
+            log.info("Saving Hospital: {}", hospital);
+
             hospitalRepository.save(hospital);
+
+            log.info("Hospital saved successfully");
+
         } else {
+
             Clinic clinic = new Clinic();
             clinic.setUser(savedUser);
             clinic.setOwner(savedUser);
             clinic.setClinicName(request.getEntityName());
             clinic.setClinicCode(generateUniqueClinicCode());
+
+            // IMPORTANT
+            // Add this only if registration number exists in request
+            // clinic.setRegistrationNumber(request.getRegistrationNumber());
+
             clinic.setAddressLine1(request.getAddressLine1());
             clinic.setCity(request.getCity());
             clinic.setState(request.getState());
@@ -151,31 +182,55 @@ public class AuthServiceImpl implements AuthService {
             clinic.setMaxDoctorLimit(sub.getAllowedDoctors());
             clinic.setActiveDoctorCount(0);
             clinic.setStatus(EntityStatus.ACTIVE);
+           // clinic.setRegistrationNumber(adminEmail);
+
+            log.info("Clinic Name: {}", clinic.getClinicName());
+            log.info("Clinic Code: {}", clinic.getClinicCode());
+            log.info("Registration Number: {}", clinic.getRegistrationNumber());
+
             clinicRepository.save(clinic);
+
+            log.info("Clinic saved successfully");
         }
-
-
-//        LoginCredential loginCred = new LoginCredential();
-//        loginCred.setUser(savedUser);
-//        loginCred.setUsername(savedUser.getEmail());
-//        loginCred.setPasswordHash(savedUser.getPassword());
-//        loginCred.setLoginStatus(LoginStatus.ACTIVE);
-//        loginCredentialRepository.save(loginCred);
 
         log.info("New user registered: {}", savedUser.getEmail());
 
         String approvalToken = ApprovalTokenUtils.generateToken(
-                savedUser.getId().toString(), adminEmail, jwtSecret);
+                savedUser.getId().toString(),
+                adminEmail,
+                jwtSecret
+        );
+
         String approvalUrl = baseUrl + "/api/admin/approve-email"
                 + "?userId=" + savedUser.getId()
                 + "&token=" + approvalToken;
 
         emailService.sendRegistrationNotificationToAdmin(
-                adminEmail, savedUser.getFullName(), request.getEntityName(),
-                savedUser.getEmail(), pkg.getPackageName(), pkg.getBaseDoctorLimit(),
+                adminEmail,
+                savedUser.getFullName(),
+                request.getEntityName(),
+                savedUser.getEmail(),
+                pkg.getPackageName(),
+                pkg.getBaseDoctorLimit(),
                 approvalUrl
         );
+
+    } catch (Exception e) {
+
+        log.error("Registration failed", e);
+
+        Throwable root = e;
+        while (root.getCause() != null) {
+            root = root.getCause();
+        }
+
+        log.error("ROOT CAUSE => {}", root.getMessage());
+
+        throw new BusinessException(
+                "Registration failed: " + root.getMessage()
+        );
     }
+}
 
     @Override
     public AuthResponse login(LoginRequest request) {

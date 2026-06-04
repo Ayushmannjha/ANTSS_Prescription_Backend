@@ -36,6 +36,9 @@ public class UserSubscription {
     @Column(nullable = false)
     private Integer usedDoctors = 0;
 
+    @Column(nullable = true)
+    private Long entityId;
+
     @Column(nullable = false)
     private Integer allowedHospitals = 1;
 

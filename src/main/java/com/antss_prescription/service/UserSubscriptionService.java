@@ -8,6 +8,7 @@ import com.antss_prescription.dto.request.UserSubscriptionSummaryDto;
 import com.antss_prescription.dto.request.UserSubscriptionSummaryDto.DoctorAddonDto;
 import com.antss_prescription.dto.request.UserSubscriptionSummaryDto.DoctorAllocationDto;
 import com.antss_prescription.dto.request.UserSubscriptionSummaryDto.FacilityDto;
+import com.antss_prescription.dto.response.UserBasicDto;
 import com.antss_prescription.enums.SubscriptionStatus;
 
 public interface UserSubscriptionService {
@@ -369,6 +370,16 @@ public interface UserSubscriptionService {
      * Total number of active (allocated) doctors across all subscriptions.
      */
     long countTotalAllocatedDoctors();
+    
+ // In section 9. ADMIN / REPORTING
+
+    /**
+     * Returns a summary snapshot for every user in the system.
+     * Users with no active subscription will have null subscription fields.
+     *
+     * @return list of all user subscription summaries
+     */
+    List<UserBasicDto> getAllUsers();
 
     // =========================================================================
     // EXCEPTION TYPES

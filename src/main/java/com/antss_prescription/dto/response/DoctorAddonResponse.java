@@ -26,4 +26,11 @@ public class DoctorAddonResponse {
     private AddonApprovalStatus approvalStatus;
     private UUID approvedByUserId;
     private LocalDateTime approvedAt;
+    private String username;
+    private String userEmail;
+    private String entityName;
+    private String entityType;
+    private String state;
+    private String city;
+    private String address;
 }
