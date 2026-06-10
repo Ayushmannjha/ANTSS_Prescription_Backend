@@ -1,31 +1,18 @@
 package com.antss_prescription.dto.response;
 
-import com.antss_prescription.enums.Gender;
-import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.UUID;
+import java.util.List;
 
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
+@Builder
 public class PrescriptionResponse {
-    private Long id;
-    private String prescriptionNumber;
+    private int prescriptionId;
+    private int consultationId;
+    private String consultationNumber;
     private String patientName;
-    private Integer patientAge;
-    private Gender patientGender;
-    private String patientMobile;
-    private String diagnosis;
-    private String symptoms;
-    private String medicines;
-    private String advice;
-    private LocalDate followUpDate;
-    private UUID doctorId;
-    private String doctorName;
-    private Long hospitalId;
-    private Long clinicId;
+    private String notes;
     private LocalDateTime createdAt;
+    private List<String> medicines;
 }

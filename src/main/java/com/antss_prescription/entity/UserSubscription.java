@@ -1,15 +1,30 @@
 package com.antss_prescription.entity;
 
-import com.antss_prescription.enums.PaymentStatus;
-import com.antss_prescription.enums.SubscriptionStatus;
-import jakarta.persistence.*;
-import lombok.Data;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import com.antss_prescription.enums.PaymentStatus;
+import com.antss_prescription.enums.SubscriptionStatus;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import lombok.Data;
+import lombok.ToString;
+
 @Entity
 @Data
+@ToString(exclude = {"user"})
 public class UserSubscription {
 
     @Id

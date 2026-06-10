@@ -1,28 +1,54 @@
 package com.antss_prescription.service.impl;
 
-import com.antss_prescription.dto.request.*;
-import com.antss_prescription.dto.response.AuthResponse;
-import com.antss_prescription.dto.response.UserResponse;
-import com.antss_prescription.entity.*;
-import com.antss_prescription.enums.*;
-import com.antss_prescription.exception.BusinessException;
-import com.antss_prescription.exception.ResourceNotFoundException;
-import com.antss_prescription.exception.UnauthorizedException;
-import com.antss_prescription.repository.*;
-import com.antss_prescription.security.ApprovalTokenUtils;
-import com.antss_prescription.security.JwtTokenProvider;
-import com.antss_prescription.service.AuthService;
-import com.antss_prescription.service.EmailService;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import lombok.extern.slf4j.Slf4j;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.antss_prescription.dto.request.ForgotPasswordRequest;
+import com.antss_prescription.dto.request.LoginRequest;
+import com.antss_prescription.dto.request.RefreshTokenRequest;
+import com.antss_prescription.dto.request.RegisterRequest;
+import com.antss_prescription.dto.request.ResetPasswordRequest;
+import com.antss_prescription.dto.response.AuthResponse;
+import com.antss_prescription.dto.response.UserResponse;
+import com.antss_prescription.entity.Clinic;
+import com.antss_prescription.entity.Doctor;
+import com.antss_prescription.entity.Hospital;
+import com.antss_prescription.entity.LoginCredential;
+import com.antss_prescription.entity.LoginSession;
+import com.antss_prescription.entity.SubscriptionPackage;
+import com.antss_prescription.entity.User;
+import com.antss_prescription.entity.UserSubscription;
+import com.antss_prescription.enums.DurationType;
+import com.antss_prescription.enums.EntityStatus;
+import com.antss_prescription.enums.PaymentStatus;
+import com.antss_prescription.enums.RegistrationStatus;
+import com.antss_prescription.enums.Role;
+import com.antss_prescription.enums.SubscriptionStatus;
+import com.antss_prescription.enums.UserType;
+import com.antss_prescription.exception.BusinessException;
+import com.antss_prescription.exception.ResourceNotFoundException;
+import com.antss_prescription.exception.UnauthorizedException;
+import com.antss_prescription.repository.ClinicRepository;
+import com.antss_prescription.repository.DoctorRepository;
+import com.antss_prescription.repository.HospitalRepository;
+import com.antss_prescription.repository.LoginCredentialRepository;
+import com.antss_prescription.repository.LoginSessionRepository;
+import com.antss_prescription.repository.PackageRepository;
+import com.antss_prescription.repository.UserRepository;
+import com.antss_prescription.repository.UserSubscriptionRepository;
+import com.antss_prescription.security.ApprovalTokenUtils;
+import com.antss_prescription.security.JwtTokenProvider;
+import com.antss_prescription.service.AuthService;
+import com.antss_prescription.service.EmailService;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -39,6 +65,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailService emailService;
+    private final DoctorRepository doctorRepository;
 
     @Value("${app.admin.email}")
     private String adminEmail;
@@ -58,7 +85,8 @@ public class AuthServiceImpl implements AuthService {
                            LoginCredentialRepository loginCredentialRepository,
                            PasswordEncoder passwordEncoder,
                            JwtTokenProvider jwtTokenProvider,
-                           EmailService emailService) {
+                           EmailService emailService,
+                           DoctorRepository doctorRepository) {
         this.userRepository = userRepository;
         this.packageRepository = packageRepository;
         this.loginSessionRepository = loginSessionRepository;
@@ -69,6 +97,7 @@ public class AuthServiceImpl implements AuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
         this.emailService = emailService;
+        this.doctorRepository = doctorRepository;
     }
 
   @Override
@@ -256,10 +285,33 @@ public void register(RegisterRequest request) {
         }
 
         List<UserSubscription> activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(user.getId(), SubscriptionStatus.ACTIVE);
+        System.out.println("===printintg usertype==="+user.getUserType());
+        if (user.getUserType().equals(UserType.DOCTOR)) {
+            Doctor doctor = doctorRepository.findByUserId(user.getId()).get();
+            Hospital hospital = doctor.getHospital();
+            Clinic clinic = doctor.getClinic();
+
+            if (hospital != null) {
+                UUID hospitalUserId = hospital.getUser().getId();
+                System.out.println("====hospital is not empty====" + hospitalUserId);
+                activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(
+                        hospitalUserId, SubscriptionStatus.ACTIVE);
+            } else if (clinic != null) {
+                UUID clinicUserId = clinic.getUser().getId();
+                System.out.println("====Clinic is not empty====" + clinicUserId);
+                activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(
+                        clinicUserId, SubscriptionStatus.ACTIVE);
+            } else {
+                throw new RuntimeException("Doctor is not associated with any Hospital or Clinic");
+            }
+        }
+        
         boolean hasValidSub = false;
         LocalDate today = LocalDate.now();
-
+        System.out.println("=======Doctor login Subscription checker=======");
+        System.out.println(activeSubs);
         for (UserSubscription sub : activeSubs) {
+        	System.out.println(sub.getEndDate());
             if (today.isAfter(sub.getEndDate())) {
                 sub.setSubscriptionStatus(SubscriptionStatus.EXPIRED);
                 userSubscriptionRepository.save(sub);
