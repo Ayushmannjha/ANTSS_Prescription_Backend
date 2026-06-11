@@ -1,6 +1,9 @@
 package com.antss_prescription.entity.prescription;
 
 import java.time.LocalDateTime;
+
+import com.antss_prescription.entity.Doctor;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -13,6 +16,10 @@ public class Consultation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int consultationId;
 
+    @ManyToOne
+    @JoinColumn(name = "doctor_id")
+    private Doctor doctor;
+    
     private String consultationNumber;
 
     @ManyToOne
@@ -43,6 +50,7 @@ public class Consultation {
     @JoinColumn(name = "vitals_id")
     private Vitals vitals;
 
+    
     private String advice;
     private LocalDateTime followUpDate;
     private LocalDateTime createdAt;

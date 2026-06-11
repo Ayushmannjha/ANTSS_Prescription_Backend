@@ -52,9 +52,20 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     // CREATE
     // ─────────────────────────────────────────────
     @Override
-    @Transactional
-    public PrescriptionResponse savePrescription(SavePrescriptionRequest req) {
+	@Transactional
+	public PrescriptionResponse savePrescription(SavePrescriptionRequest req) {
 
+    Consultation consultation;
+
+    if (req.getConsultationId() != null) {
+    	System.out.println("Consultation is present");
+        // ── Use existing consultation ──
+        consultation = consultationRepository.findById(req.getConsultationId())
+                .orElseThrow(() -> new RuntimeException(
+                        "Consultation not found: " + req.getConsultationId()));
+    } else {
+    	System.out.println("Consultation is not present");
+        // ── Create new consultation with all child entities ──
         PatientRegistration registration = registrationRepository
                 .findById(req.getRegistrationId())
                 .orElseThrow(() -> new RuntimeException(
@@ -102,7 +113,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
         diagnosis.setUpdatedAt(LocalDateTime.now());
         diagnosis = diagnosisRepository.save(diagnosis);
 
-        Consultation consultation = new Consultation();
+        consultation = new Consultation();
         consultation.setConsultationNumber("CONS-" + UUID.randomUUID()
                 .toString().substring(0, 8).toUpperCase());
         consultation.setPatientRegistration(registration);
@@ -117,31 +128,35 @@ public class PrescriptionServiceImpl implements PrescriptionService {
         consultation.setCreatedAt(LocalDateTime.now());
         consultation.setUpdatedAt(LocalDateTime.now());
         consultation = consultationRepository.save(consultation);
-
-        Prescription prescription = new Prescription();
-        prescription.setConsultation(consultation);
-        prescription.setNotes(req.getNotes());
-        prescription.setCreatedAt(LocalDateTime.now());
-        prescription = prescriptionRepository.save(prescription);
-
-        List<PrescriptionMedicines> medicines = new ArrayList<>();
-        for (SavePrescriptionRequest.MedicineRequest m : req.getMedicines()) {
-            PrescriptionMedicines med = new PrescriptionMedicines();
-            med.setPrescription(prescription);
-            med.setMedicineName(m.getMedicineName());
-            med.setStrength(m.getStrength());
-            med.setDosage(m.getDosage());
-            med.setFrequency(m.getFrequency());
-            med.setDuration(m.getDuration());
-            med.setInstruction(m.getInstruction());
-            med.setQuantity(m.getQuantity());
-            med.setCreatedAt(LocalDateTime.now());
-            prescriptionMedicinesRepository.save(med);
-            medicines.add(med);
-        }
-
-        return buildResponse(prescription, consultation, registration, medicines);
     }
+
+    // ── Save Prescription ──
+    Prescription prescription = new Prescription();
+    prescription.setConsultation(consultation);
+    prescription.setNotes(req.getNotes());
+    prescription.setCreatedAt(LocalDateTime.now());
+    prescription = prescriptionRepository.save(prescription);
+
+    // ── Save Medicines ──
+    List<PrescriptionMedicines> medicines = new ArrayList<>();
+    for (SavePrescriptionRequest.MedicineRequest m : req.getMedicines()) {
+        PrescriptionMedicines med = new PrescriptionMedicines();
+        med.setPrescription(prescription);
+        med.setMedicineName(m.getMedicineName());
+        med.setStrength(m.getStrength());
+        med.setDosage(m.getDosage());
+        med.setFrequency(m.getFrequency());
+        med.setDuration(m.getDuration());
+        med.setInstruction(m.getInstruction());
+        med.setQuantity(m.getQuantity());
+        med.setCreatedAt(LocalDateTime.now());
+        prescriptionMedicinesRepository.save(med);
+        medicines.add(med);
+    }
+
+    PatientRegistration registration = consultation.getPatientRegistration();
+    return buildResponse(prescription, consultation, registration, medicines);
+}
 
     // ─────────────────────────────────────────────
     // READ — single by prescription ID

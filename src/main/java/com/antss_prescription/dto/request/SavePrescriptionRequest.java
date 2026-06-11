@@ -5,6 +5,7 @@ import java.util.List;
 
 @Data
 public class SavePrescriptionRequest {
+	private Integer consultationId;
 
     // --- Vitals ---
     private int height;

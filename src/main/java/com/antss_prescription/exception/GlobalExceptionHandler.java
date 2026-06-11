@@ -1,23 +1,35 @@
 package com.antss_prescription.exception;
 
-import com.antss_prescription.dto.response.ApiResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import lombok.extern.slf4j.Slf4j;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.antss_prescription.dto.response.ApiResponse;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+	@ExceptionHandler(DuplicateRegistrationException.class)
+	public ResponseEntity<Map<String, Object>> handleDuplicateRegistration(
+	        DuplicateRegistrationException ex) {
 
+	    Map<String, Object> response = new HashMap<>();
+	    response.put("status", 400);
+	    response.put("error", "Duplicate Registration");
+	    response.put("message", ex.getMessage());
+	    response.put("timestamp", LocalDateTime.now());
+
+	    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+	}
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleResourceNotFound(ResourceNotFoundException ex) {
