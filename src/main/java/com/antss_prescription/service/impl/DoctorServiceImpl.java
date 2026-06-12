@@ -183,7 +183,36 @@ public class DoctorServiceImpl implements DoctorService {
         log.info("Doctor added: {} with code {}", savedDoctor.getDoctorName(), savedDoctor.getDoctorCode());
         return mapToResponse(savedDoctor);
     }
-
+ @Override
+public DoctorResponse getDoctorByUserId(UUID id) {
+    Doctor doctor = doctorRepository.findByUserId(id);
+    
+    if (doctor == null) {
+        throw new RuntimeException("Doctor not found for userId: " + id);
+    }
+    
+    DoctorResponse response = new DoctorResponse();
+    response.setId(doctor.getId());
+    response.setDoctorName(doctor.getDoctorName());
+    response.setDoctorCode(doctor.getDoctorCode());
+    response.setSpecialization(doctor.getSpecialization());
+    response.setQualification(doctor.getQualification());
+    response.setExperienceYears(doctor.getExperienceYears());
+    response.setEmail(doctor.getEmail());
+    response.setMobileNumber(doctor.getMobileNumber());
+    response.setRegistrationNumber(doctor.getRegistrationNumber());
+    response.setSignatureUrl(doctor.getSignatureUrl());
+    response.setStatus(doctor.getStatus());
+    
+    if (doctor.getHospital() != null) {
+        response.setHospitalId(doctor.getHospital().getId());
+    }
+    if (doctor.getClinic() != null) {
+        response.setClinicId(doctor.getClinic().getId());
+    }
+    
+    return response;
+}
     @Override
     public DoctorResponse updateDoctor(UUID id, UpdateDoctorRequest request, UUID userId) {
         Doctor doctor = getDoctorAndVerifyAccess(id, userId);
