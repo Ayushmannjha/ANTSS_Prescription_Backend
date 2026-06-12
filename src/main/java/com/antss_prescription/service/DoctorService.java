@@ -13,4 +13,5 @@ public interface DoctorService {
     void deleteDoctor(UUID id, UUID userId);
     List<DoctorResponse> listDoctors(UUID userId);
     DoctorResponse getDoctorById(UUID id, UUID userId);
+    DoctorResponse getDoctorByUserId(UUID id);
 }
