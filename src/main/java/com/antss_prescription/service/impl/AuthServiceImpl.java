@@ -287,7 +287,8 @@ public void register(RegisterRequest request) {
         List<UserSubscription> activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(user.getId(), SubscriptionStatus.ACTIVE);
         System.out.println("===printintg usertype==="+user.getUserType());
         if (user.getUserType().equals(UserType.DOCTOR)) {
-            Doctor doctor = doctorRepository.findByUserId(user.getId()).get();
+            Doctor doctor = doctorRepository.findByUserId(user.getId())
+                    .orElseThrow(() -> new UnauthorizedException("Doctor profile not found for user: " + user.getEmail()));
             Hospital hospital = doctor.getHospital();
             Clinic clinic = doctor.getClinic();
 
@@ -436,6 +437,29 @@ public void register(RegisterRequest request) {
         response.setRole(user.getRole());
         response.setRegistrationDate(user.getRegistrationDate());
         response.setCreatedAt(user.getCreatedAt());
+
+        if (user.getUserType() == UserType.DOCTOR) {
+            doctorRepository.findByUserId(user.getId()).ifPresent(doctor -> {
+                response.setDoctorId(doctor.getId());
+                if (doctor.getHospital() != null) {
+                    response.setHospitalId(doctor.getHospital().getId());
+                }
+                if (doctor.getClinic() != null) {
+                    response.setClinicId(doctor.getClinic().getId());
+                }
+            });
+        } else if (user.getUserType() == UserType.HOSPITAL) {
+            List<Hospital> hospitals = hospitalRepository.findByUserId(user.getId());
+            if (!hospitals.isEmpty()) {
+                response.setHospitalId(hospitals.get(0).getId());
+            }
+        } else if (user.getUserType() == UserType.CLINIC) {
+            List<Clinic> clinics = clinicRepository.findByUserId(user.getId());
+            if (!clinics.isEmpty()) {
+                response.setClinicId(clinics.get(0).getId());
+            }
+        }
+
         return response;
     }
 

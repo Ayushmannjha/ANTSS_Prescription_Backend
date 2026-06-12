@@ -2,6 +2,7 @@ package com.antss_prescription.controller;
 
 import java.util.List;
 
+import com.antss_prescription.dto.response.DetailedPrescriptionResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +17,7 @@ import com.antss_prescription.dto.request.SavePrescriptionRequest;
 import com.antss_prescription.dto.request.UpdatePrescriptionRequest;
 import com.antss_prescription.dto.response.PrescriptionResponse;
 import com.antss_prescription.service.PrescriptionService;
+
 
 import lombok.RequiredArgsConstructor;
 @RestController
@@ -53,6 +55,18 @@ public class PrescriptionController {
         return ResponseEntity.ok(
                 prescriptionService.getPrescriptionsByRegistrationId(registrationId));
     }
+
+    @GetMapping("/detail/{id}")
+    public ResponseEntity<DetailedPrescriptionResponse> getDetailedById(@PathVariable int id) {
+        return ResponseEntity.ok(prescriptionService.getDetailedPrescriptionById(id));
+    }
+
+    @GetMapping("/patient/{patientId}/detail")
+    public ResponseEntity<List<DetailedPrescriptionResponse>> getDetailedByPatient(
+            @PathVariable int patientId) {
+        return ResponseEntity.ok(prescriptionService.getDetailedPrescriptionsByPatientId(patientId));
+    }
+
 
     @PutMapping("/update/{id}")
     public ResponseEntity<PrescriptionResponse> update(

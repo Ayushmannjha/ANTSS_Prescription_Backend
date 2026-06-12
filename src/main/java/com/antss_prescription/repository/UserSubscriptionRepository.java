@@ -1,5 +1,6 @@
 package com.antss_prescription.repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,4 +37,49 @@ public interface UserSubscriptionRepository extends JpaRepository<UserSubscripti
             ORDER BY us.startDate DESC
             """)
     List<UserSubscription> findAllByUserId(@Param("userId") UUID userId);
+
+    @Query("""
+            SELECT us FROM UserSubscription us
+            JOIN FETCH us.user
+            JOIN FETCH us.subscriptionPackage
+            WHERE us.subscriptionStatus = 'ACTIVE'
+              AND us.endDate >= :today
+              AND us.endDate <= :limitDate
+            """)
+    List<UserSubscription> findExpiringSubscriptions(@Param("today") LocalDate today, @Param("limitDate") LocalDate limitDate);
+
+    @Query("""
+            SELECT us FROM UserSubscription us
+            JOIN FETCH us.user
+            JOIN FETCH us.subscriptionPackage
+            WHERE us.subscriptionStatus = :status
+            """)
+    List<UserSubscription> findBySubscriptionStatusWithRelations(@Param("status") SubscriptionStatus status);
+
+    @Query("""
+            SELECT us FROM UserSubscription us
+            JOIN FETCH us.user
+            JOIN FETCH us.subscriptionPackage
+            WHERE us.subscriptionStatus = 'ACTIVE'
+            """)
+    List<UserSubscription> findAllActiveSubscriptionsWithRelations();
+
+    @Query("""
+            SELECT us FROM UserSubscription us
+            JOIN FETCH us.user
+            JOIN FETCH us.subscriptionPackage
+            WHERE us.subscriptionPackage.id = :packageId
+            """)
+    List<UserSubscription> findByPackageIdWithRelations(@Param("packageId") Long packageId);
+
+    @Query("""
+            SELECT DISTINCT us FROM UserSubscription us
+            JOIN FETCH us.user
+            JOIN FETCH us.subscriptionPackage
+            JOIN DoctorAddon da ON da.userSubscription = us
+            WHERE da.approvalStatus = 'PENDING'
+            """)
+    List<UserSubscription> findSubscriptionsWithPendingAddons();
+
+    long countBySubscriptionStatus(SubscriptionStatus subscriptionStatus);
 }

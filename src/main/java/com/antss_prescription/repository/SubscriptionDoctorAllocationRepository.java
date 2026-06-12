@@ -30,4 +30,14 @@ public interface SubscriptionDoctorAllocationRepository extends JpaRepository<Su
             """)
     List<SubscriptionDoctorAllocation> findActiveBySubscriptionId(
             @Param("subscriptionId") UUID subscriptionId);
+
+    @Query("""
+            SELECT sda FROM SubscriptionDoctorAllocation sda
+            JOIN FETCH sda.doctor d
+            WHERE sda.userSubscription.id = :subscriptionId
+            ORDER BY sda.allocatedAt DESC
+            """)
+    List<SubscriptionDoctorAllocation> findAllBySubscriptionId(@Param("subscriptionId") UUID subscriptionId);
+
+    long countByStatus(AllocationStatus status);
 }
