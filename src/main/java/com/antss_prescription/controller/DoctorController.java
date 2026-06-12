@@ -73,6 +73,14 @@ public class DoctorController {
         return ResponseEntity.ok(ApiResponse.success("Doctor fetched successfully", response));
     }
 
+    @GetMapping("/profile")
+    @Operation(summary = "Get current doctor's profile details")
+    public ResponseEntity<ApiResponse<DoctorResponse>> getDoctorProfile() {
+        UUID userId = getCurrentUserId();
+        DoctorResponse response = doctorService.getDoctorByUserId(userId);
+        return ResponseEntity.ok(ApiResponse.success("Doctor profile fetched successfully", response));
+    }
+
     private UUID getCurrentUserId() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email)

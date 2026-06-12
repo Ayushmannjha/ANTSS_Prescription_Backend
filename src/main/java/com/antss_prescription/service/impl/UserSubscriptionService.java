@@ -1,8 +1,10 @@
 package com.antss_prescription.service.impl;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -23,11 +25,16 @@ import com.antss_prescription.entity.SubscriptionPackage;
 import com.antss_prescription.entity.User;
 import com.antss_prescription.entity.UserSubscription;
 import com.antss_prescription.enums.AddonApprovalStatus;
+import com.antss_prescription.enums.AllocationStatus;
+import com.antss_prescription.enums.AllocationType;
+import com.antss_prescription.enums.DurationType;
 import com.antss_prescription.enums.PaymentStatus;
 import com.antss_prescription.enums.SubscriptionStatus;
 import com.antss_prescription.repository.ClinicRepository;
 import com.antss_prescription.repository.DoctorAddonRepository;
+import com.antss_prescription.repository.DoctorRepository;
 import com.antss_prescription.repository.HospitalRepository;
+import com.antss_prescription.repository.PackageRepository;
 import com.antss_prescription.repository.SubscriptionDoctorAllocationRepository;
 import com.antss_prescription.repository.UserRepository;
 import com.antss_prescription.repository.UserSubscriptionRepository;
@@ -47,6 +54,8 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
     private final SubscriptionDoctorAllocationRepository allocationRepository;
     private final HospitalRepository                   hospitalRepository;
     private final ClinicRepository                     clinicRepository;
+    private final PackageRepository                    packageRepository;
+    private final DoctorRepository                     doctorRepository;
  
     // ──────────────────────────────────────────────────────────────────────
     // PUBLIC API
@@ -70,6 +79,10 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
                 .findActiveByUserId(userId)
                 .orElseThrow(() -> new NoActiveSubscriptionException(userId));
  
+        return mapSubscriptionToSummary(subscription, user);
+    }
+
+    private UserSubscriptionSummaryDto mapSubscriptionToSummary(UserSubscription subscription, User user) {
         SubscriptionPackage pkg = subscription.getSubscriptionPackage();
  
         // ── Addons ──────────────────────────────────────────────────────
@@ -89,8 +102,6 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
  
         // ── Effective doctor ceiling ─────────────────────────────────────
-        // The subscription's allowedDoctors field is the ground-truth stored
-        // value; we also expose it derived (base + addons) for transparency.
         int effectiveAllowed = pkg.getBaseDoctorLimit() + totalApprovedAddonDoctors;
  
         // ── Allocations ──────────────────────────────────────────────────
@@ -262,248 +273,509 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 
 	@Override
 	public List<UserSubscriptionSummaryDto> getSubscriptionHistory(UUID userId) {
-		// TODO Auto-generated method stub
-		return null;
+		User user = userRepository.findById(userId)
+				.orElseThrow(() -> new UserNotFoundException(userId));
+		List<UserSubscription> subscriptions = subscriptionRepository.findAllByUserId(userId);
+		return subscriptions.stream()
+				.map(sub -> mapSubscriptionToSummary(sub, user))
+				.collect(Collectors.toList());
 	}
 
 	@Override
 	public List<UserSubscriptionSummaryDto> getSubscriptionsExpiringWithin(int withinDays) {
-		// TODO Auto-generated method stub
-		return null;
+		LocalDate today = LocalDate.now();
+		LocalDate limitDate = today.plusDays(withinDays);
+		List<UserSubscription> subscriptions = subscriptionRepository.findExpiringSubscriptions(today, limitDate);
+		return subscriptions.stream()
+				.map(sub -> mapSubscriptionToSummary(sub, sub.getUser()))
+				.collect(Collectors.toList());
 	}
 
 	@Override
 	public List<UserSubscriptionSummaryDto> getSubscriptionsByStatus(SubscriptionStatus status) {
-		// TODO Auto-generated method stub
-		return null;
+		List<UserSubscription> subscriptions = subscriptionRepository.findBySubscriptionStatusWithRelations(status);
+		return subscriptions.stream()
+				.map(sub -> mapSubscriptionToSummary(sub, sub.getUser()))
+				.collect(Collectors.toList());
 	}
 
 	@Override
 	public boolean canAddDoctor(UUID userId) {
-		// TODO Auto-generated method stub
-		return false;
+		if (!hasValidSubscription(userId)) {
+			return false;
+		}
+		return getRemainingDoctorSlots(userId) > 0;
 	}
 
 	@Override
 	public boolean canAddHospital(UUID userId) {
-		// TODO Auto-generated method stub
-		return false;
+		if (!hasValidSubscription(userId)) {
+			return false;
+		}
+		return subscriptionRepository.findActiveByUserId(userId)
+				.map(sub -> getHospitalCount(userId) < sub.getAllowedHospitals())
+				.orElse(false);
 	}
 
 	@Override
 	public boolean canAddClinic(UUID userId) {
-		// TODO Auto-generated method stub
-		return false;
+		if (!hasValidSubscription(userId)) {
+			return false;
+		}
+		return subscriptionRepository.findActiveByUserId(userId)
+				.map(sub -> getClinicCount(userId) < sub.getAllowedClinics())
+				.orElse(false);
 	}
 
 	@Override
 	public boolean canCreatePrescription(UUID userId) {
-		// TODO Auto-generated method stub
-		return false;
+		return hasValidSubscription(userId);
 	}
 
 	@Override
 	public int getEffectiveAllowedDoctors(UUID userId) {
-		// TODO Auto-generated method stub
-		return 0;
+		return subscriptionRepository.findActiveByUserId(userId)
+				.map(sub -> {
+					List<DoctorAddon> activeAddons = addonRepository.findApprovedAndPaidBySubscriptionId(sub.getId());
+					int addonDoctors = activeAddons.stream()
+							.mapToInt(DoctorAddon::getAdditionalDoctors)
+							.sum();
+					return sub.getSubscriptionPackage().getBaseDoctorLimit() + addonDoctors;
+				})
+				.orElse(0);
 	}
 
 	@Override
 	public int getUsedDoctorCount(UUID userId) {
-		// TODO Auto-generated method stub
-		return 0;
+		return subscriptionRepository.findActiveByUserId(userId)
+				.map(UserSubscription::getUsedDoctors)
+				.orElse(0);
 	}
 
 	@Override
+	@Transactional
 	public void incrementUsedDoctors(UUID userId) {
-		// TODO Auto-generated method stub
-		
+		UserSubscription sub = subscriptionRepository.findActiveByUserId(userId)
+				.orElseThrow(() -> new NoActiveSubscriptionException(userId));
+		int allowed = getEffectiveAllowedDoctors(userId);
+		if (sub.getUsedDoctors() >= allowed) {
+			throw new DoctorQuotaExceededException(userId);
+		}
+		sub.setUsedDoctors(sub.getUsedDoctors() + 1);
+		subscriptionRepository.save(sub);
 	}
 
 	@Override
+	@Transactional
 	public void decrementUsedDoctors(UUID userId) {
-		// TODO Auto-generated method stub
-		
+		UserSubscription sub = subscriptionRepository.findActiveByUserId(userId)
+				.orElseThrow(() -> new NoActiveSubscriptionException(userId));
+		int current = sub.getUsedDoctors();
+		sub.setUsedDoctors(Math.max(0, current - 1));
+		subscriptionRepository.save(sub);
 	}
 
 	@Override
+	@Transactional
 	public UUID createSubscription(UUID userId, Long packageId) {
-		// TODO Auto-generated method stub
-		return null;
+		User user = userRepository.findById(userId)
+				.orElseThrow(() -> new UserNotFoundException(userId));
+		
+		if (subscriptionRepository.findActiveByUserId(userId).isPresent()) {
+			throw new DuplicateSubscriptionException(userId);
+		}
+		
+		SubscriptionPackage pkg = packageRepository.findById(packageId)
+				.orElseThrow(() -> new PackageNotFoundException(packageId));
+		if (!pkg.isActive()) {
+			throw new PackageNotFoundException(packageId);
+		}
+		
+		UserSubscription sub = new UserSubscription();
+		sub.setUser(user);
+		sub.setSubscriptionPackage(pkg);
+		sub.setStartDate(LocalDate.now());
+		
+		LocalDate endDate = LocalDate.now();
+		if (pkg.getDurationType() == DurationType.SIX_MONTH) {
+			endDate = endDate.plusMonths(6);
+		} else if (pkg.getDurationType() == DurationType.ONE_YEAR) {
+			endDate = endDate.plusYears(1);
+		} else if (pkg.getDurationType() == DurationType.TWO_YEAR) {
+			endDate = endDate.plusYears(2);
+		}
+		
+		sub.setEndDate(endDate);
+		sub.setAllowedDoctors(pkg.getBaseDoctorLimit());
+		sub.setUsedDoctors(0);
+		sub.setAllowedHospitals(1);
+		sub.setAllowedClinics(1);
+		sub.setPaymentStatus(PaymentStatus.PENDING);
+		sub.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+		
+		UserSubscription saved = subscriptionRepository.save(sub);
+		return saved.getId();
 	}
 
 	@Override
+	@Transactional
 	public UserSubscriptionSummaryDto renewSubscription(UUID subscriptionId) {
-		// TODO Auto-generated method stub
-		return null;
+		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
+		
+		SubscriptionPackage pkg = sub.getSubscriptionPackage();
+		LocalDate referenceDate = sub.getEndDate().isAfter(LocalDate.now()) ? sub.getEndDate() : LocalDate.now();
+		
+		LocalDate newEndDate = referenceDate;
+		if (pkg.getDurationType() == DurationType.SIX_MONTH) {
+			newEndDate = newEndDate.plusMonths(6);
+		} else if (pkg.getDurationType() == DurationType.ONE_YEAR) {
+			newEndDate = newEndDate.plusYears(1);
+		} else if (pkg.getDurationType() == DurationType.TWO_YEAR) {
+			newEndDate = newEndDate.plusYears(2);
+		}
+		
+		sub.setEndDate(newEndDate);
+		sub.setPaymentStatus(PaymentStatus.PENDING);
+		sub.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+		
+		UserSubscription saved = subscriptionRepository.save(sub);
+		return mapSubscriptionToSummary(saved, saved.getUser());
 	}
 
 	@Override
+	@Transactional
 	public UserSubscriptionSummaryDto upgradeSubscription(UUID userId, Long newPackageId) {
-		// TODO Auto-generated method stub
-		return null;
+		UserSubscription sub = subscriptionRepository.findActiveByUserId(userId)
+				.orElseThrow(() -> new NoActiveSubscriptionException(userId));
+		
+		SubscriptionPackage newPkg = packageRepository.findById(newPackageId)
+				.orElseThrow(() -> new PackageNotFoundException(newPackageId));
+		if (!newPkg.isActive()) {
+			throw new PackageNotFoundException(newPackageId);
+		}
+		
+		sub.setSubscriptionPackage(newPkg);
+		sub.setStartDate(LocalDate.now());
+		
+		LocalDate endDate = LocalDate.now();
+		if (newPkg.getDurationType() == DurationType.SIX_MONTH) {
+			endDate = endDate.plusMonths(6);
+		} else if (newPkg.getDurationType() == DurationType.ONE_YEAR) {
+			endDate = endDate.plusYears(1);
+		} else if (newPkg.getDurationType() == DurationType.TWO_YEAR) {
+			endDate = endDate.plusYears(2);
+		}
+		sub.setEndDate(endDate);
+		
+		List<DoctorAddon> activeAddons = addonRepository.findApprovedAndPaidBySubscriptionId(sub.getId());
+		int addonDoctors = activeAddons.stream()
+				.mapToInt(DoctorAddon::getAdditionalDoctors)
+				.sum();
+		sub.setAllowedDoctors(newPkg.getBaseDoctorLimit() + addonDoctors);
+		sub.setPaymentStatus(PaymentStatus.PENDING);
+		
+		UserSubscription saved = subscriptionRepository.save(sub);
+		return mapSubscriptionToSummary(saved, saved.getUser());
 	}
 
 	@Override
+	@Transactional
 	public void cancelSubscription(UUID userId, UUID cancelledBy) {
-		// TODO Auto-generated method stub
-		
+		UserSubscription sub = subscriptionRepository.findActiveByUserId(userId)
+				.orElseThrow(() -> new NoActiveSubscriptionException(userId));
+		sub.setSubscriptionStatus(SubscriptionStatus.CANCELLED);
+		subscriptionRepository.save(sub);
 	}
 
 	@Override
+	@Transactional
 	public void suspendSubscription(UUID subscriptionId, UUID suspendedBy) {
-		// TODO Auto-generated method stub
-		
+		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
+		sub.setSubscriptionStatus(SubscriptionStatus.SUSPENDED);
+		subscriptionRepository.save(sub);
 	}
 
 	@Override
+	@Transactional
 	public void reactivateSubscription(UUID subscriptionId, UUID reactivatedBy) {
-		// TODO Auto-generated method stub
-		
+		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
+		sub.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+		subscriptionRepository.save(sub);
 	}
 
 	@Override
+	@Transactional
 	public void expireSubscription(UUID subscriptionId) {
-		// TODO Auto-generated method stub
-		
+		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
+		sub.setSubscriptionStatus(SubscriptionStatus.EXPIRED);
+		subscriptionRepository.save(sub);
 	}
 
 	@Override
+	@Transactional
 	public int expireAllOverdueSubscriptions(LocalDate asOf) {
-		// TODO Auto-generated method stub
-		return 0;
+		List<UserSubscription> activeSubs = subscriptionRepository.findBySubscriptionStatus(SubscriptionStatus.ACTIVE);
+		int count = 0;
+		for (UserSubscription sub : activeSubs) {
+			if (sub.getEndDate().isBefore(asOf)) {
+				sub.setSubscriptionStatus(SubscriptionStatus.EXPIRED);
+				subscriptionRepository.save(sub);
+				count++;
+			}
+		}
+		return count;
 	}
 
 	@Override
+	@Transactional
 	public void markPaymentPaid(UUID subscriptionId, String transactionRef) {
-		// TODO Auto-generated method stub
-		
+		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
+		sub.setPaymentStatus(PaymentStatus.PAID);
+		if (sub.getSubscriptionStatus() == SubscriptionStatus.SUSPENDED) {
+			sub.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+		}
+		subscriptionRepository.save(sub);
 	}
 
 	@Override
+	@Transactional
 	public void markPaymentFailed(UUID subscriptionId, String reason) {
-		// TODO Auto-generated method stub
-		
+		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
+		sub.setPaymentStatus(PaymentStatus.FAILED);
+		sub.setSubscriptionStatus(SubscriptionStatus.SUSPENDED);
+		subscriptionRepository.save(sub);
 	}
 
 	@Override
+	@Transactional
 	public Long requestDoctorAddon(UUID subscriptionId, int additionalDoctors) {
-		// TODO Auto-generated method stub
-		return null;
+		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
+		
+		if (sub.getSubscriptionStatus() != SubscriptionStatus.ACTIVE) {
+			throw new RuntimeException("Cannot add doctors to an inactive/expired subscription");
+		}
+
+		SubscriptionPackage pkg = sub.getSubscriptionPackage();
+		BigDecimal extraPrice = pkg.getExtraDoctorPrice();
+
+		long daysRemaining = ChronoUnit.DAYS.between(LocalDate.now(), sub.getEndDate());
+		if (daysRemaining <= 0) {
+			throw new RuntimeException("Subscription is already expiring or expired");
+		}
+
+		int remainingMonths = (int) Math.max(1, Math.ceil(daysRemaining / 30.4375));
+
+		BigDecimal prorataAmount = extraPrice
+				.multiply(BigDecimal.valueOf(additionalDoctors))
+				.multiply(BigDecimal.valueOf(remainingMonths))
+				.divide(BigDecimal.valueOf(12), 2, java.math.RoundingMode.HALF_UP);
+
+		DoctorAddon addon = new DoctorAddon();
+		addon.setUserSubscription(sub);
+		addon.setAdditionalDoctors(additionalDoctors);
+		addon.setYearlyPricePerDoctor(extraPrice);
+		addon.setRemainingMonths(remainingMonths);
+		addon.setProrataAmount(prorataAmount);
+		addon.setStartDate(LocalDate.now());
+		addon.setEndDate(sub.getEndDate());
+		addon.setPaymentStatus(PaymentStatus.PENDING);
+		addon.setApprovalStatus(AddonApprovalStatus.PENDING);
+
+		DoctorAddon saved = addonRepository.save(addon);
+		return saved.getId();
 	}
 
 	@Override
+	@Transactional
 	public void approveDoctorAddon(Long addonId, UUID approvedBy) {
-		// TODO Auto-generated method stub
+		DoctorAddon addon = addonRepository.findById(addonId)
+				.orElseThrow(() -> new RuntimeException("Doctor addon not found: " + addonId));
+		User admin = userRepository.findById(approvedBy)
+				.orElseThrow(() -> new UserNotFoundException(approvedBy));
 		
+		addon.setApprovalStatus(AddonApprovalStatus.APPROVED);
+		addon.setApprovedBy(admin);
+		addon.setApprovedAt(LocalDateTime.now());
+		addonRepository.save(addon);
 	}
 
 	@Override
+	@Transactional
 	public void rejectDoctorAddon(Long addonId, UUID rejectedBy, String reason) {
-		// TODO Auto-generated method stub
-		
+		DoctorAddon addon = addonRepository.findById(addonId)
+				.orElseThrow(() -> new RuntimeException("Doctor addon not found: " + addonId));
+		addon.setApprovalStatus(AddonApprovalStatus.REJECTED);
+		addonRepository.save(addon);
 	}
 
 	@Override
+	@Transactional
 	public void markAddonPaymentPaid(Long addonId, String transactionRef) {
-		// TODO Auto-generated method stub
+		DoctorAddon addon = addonRepository.findById(addonId)
+				.orElseThrow(() -> new RuntimeException("Doctor addon not found: " + addonId));
+		addon.setPaymentStatus(PaymentStatus.PAID);
+		addonRepository.save(addon);
 		
+		UserSubscription sub = addon.getUserSubscription();
+		int currentAllowed = sub.getAllowedDoctors();
+		sub.setAllowedDoctors(currentAllowed + addon.getAdditionalDoctors());
+		subscriptionRepository.save(sub);
 	}
 
 	@Override
 	public List<DoctorAddonDto> getAddonsForSubscription(UUID subscriptionId) {
-		// TODO Auto-generated method stub
-		return null;
+		List<DoctorAddon> addons = addonRepository.findBySubscriptionId(subscriptionId);
+		return mapAddons(addons);
 	}
 
 	@Override
 	public List<DoctorAddonDto> getActiveAddonsForSubscription(UUID subscriptionId) {
-		// TODO Auto-generated method stub
-		return null;
+		List<DoctorAddon> addons = addonRepository.findApprovedAndPaidBySubscriptionId(subscriptionId);
+		LocalDate today = LocalDate.now();
+		List<DoctorAddon> activeAddons = addons.stream()
+				.filter(a -> !a.getEndDate().isBefore(today))
+				.toList();
+		return mapAddons(activeAddons);
 	}
 
 	@Override
+	@Transactional
 	public void allocateDoctor(UUID subscriptionId, UUID doctorId, String allocationType) {
-		// TODO Auto-generated method stub
+		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
 		
+		Doctor doctor = doctorRepository.findById(doctorId)
+				.orElseThrow(() -> new RuntimeException("Doctor not found: " + doctorId));
+		
+		Optional<SubscriptionDoctorAllocation> existing = allocationRepository
+				.findByUserSubscriptionIdAndDoctorIdAndStatus(subscriptionId, doctorId, AllocationStatus.ACTIVE);
+		if (existing.isPresent()) {
+			throw new DoctorAlreadyAllocatedException(doctorId, subscriptionId);
+		}
+		
+		int allowed = getEffectiveAllowedDoctors(sub.getUser().getId());
+		if (sub.getUsedDoctors() >= allowed) {
+			throw new DoctorQuotaExceededException(sub.getUser().getId());
+		}
+		
+		SubscriptionDoctorAllocation allocation = new SubscriptionDoctorAllocation();
+		allocation.setUserSubscription(sub);
+		allocation.setDoctor(doctor);
+		allocation.setAllocationType(AllocationType.valueOf(allocationType.toUpperCase()));
+		allocation.setStatus(AllocationStatus.ACTIVE);
+		
+		allocationRepository.save(allocation);
+		
+		sub.setUsedDoctors(sub.getUsedDoctors() + 1);
+		subscriptionRepository.save(sub);
 	}
 
 	@Override
+	@Transactional
 	public void deallocateDoctor(UUID subscriptionId, UUID doctorId) {
-		// TODO Auto-generated method stub
+		SubscriptionDoctorAllocation allocation = allocationRepository
+				.findByUserSubscriptionIdAndDoctorIdAndStatus(subscriptionId, doctorId, AllocationStatus.ACTIVE)
+				.orElseThrow(() -> new RuntimeException("Active allocation not found for doctor: " + doctorId + " under subscription: " + subscriptionId));
 		
+		allocation.setStatus(AllocationStatus.INACTIVE);
+		allocationRepository.save(allocation);
+		
+		UserSubscription sub = allocation.getUserSubscription();
+		sub.setUsedDoctors(Math.max(0, sub.getUsedDoctors() - 1));
+		subscriptionRepository.save(sub);
 	}
 
 	@Override
 	public List<DoctorAllocationDto> getActiveDoctorAllocations(UUID subscriptionId) {
-		// TODO Auto-generated method stub
-		return null;
+		List<SubscriptionDoctorAllocation> allocations = allocationRepository.findActiveBySubscriptionId(subscriptionId);
+		return mapAllocations(allocations);
 	}
 
 	@Override
 	public List<DoctorAllocationDto> getAllDoctorAllocations(UUID subscriptionId) {
-		// TODO Auto-generated method stub
-		return null;
+		List<SubscriptionDoctorAllocation> allocations = allocationRepository.findAllBySubscriptionId(subscriptionId);
+		return mapAllocations(allocations);
 	}
 
 	@Override
 	public List<UserSubscriptionSummaryDto> getSubscriptionsForDoctor(UUID doctorId) {
-		// TODO Auto-generated method stub
-		return null;
+		Doctor doctor = doctorRepository.findById(doctorId)
+				.orElseThrow(() -> new RuntimeException("Doctor not found: " + doctorId));
+		List<SubscriptionDoctorAllocation> allocations = allocationRepository
+				.findByDoctorAndStatus(doctor, AllocationStatus.ACTIVE);
+		return allocations.stream()
+				.map(sda -> {
+					UserSubscription sub = sda.getUserSubscription();
+					return mapSubscriptionToSummary(sub, sub.getUser());
+				})
+				.collect(Collectors.toList());
 	}
 
 	@Override
 	public List<FacilityDto> getLinkedHospitals(UUID userId) {
-		// TODO Auto-generated method stub
-		return null;
+		User user = userRepository.findById(userId)
+				.orElseThrow(() -> new UserNotFoundException(userId));
+		List<Hospital> hospitals = hospitalRepository.findByOwnerUser(user);
+		return mapHospitals(hospitals);
 	}
 
 	@Override
 	public List<FacilityDto> getLinkedClinics(UUID userId) {
-		// TODO Auto-generated method stub
-		return null;
+		User user = userRepository.findById(userId)
+				.orElseThrow(() -> new UserNotFoundException(userId));
+		List<Clinic> clinics = clinicRepository.findByOwnerUser(user);
+		return mapClinics(clinics);
 	}
 
 	@Override
 	public int getHospitalCount(UUID userId) {
-		// TODO Auto-generated method stub
-		return 0;
+		return hospitalRepository.findByOwnerId(userId).size();
 	}
 
 	@Override
 	public int getClinicCount(UUID userId) {
-		// TODO Auto-generated method stub
-		return 0;
+		return clinicRepository.findByOwnerId(userId).size();
 	}
 
 	@Override
 	public List<UserSubscriptionSummaryDto> getAllActiveSubscriptions() {
-		// TODO Auto-generated method stub
-		return null;
+		List<UserSubscription> subscriptions = subscriptionRepository.findAllActiveSubscriptionsWithRelations();
+		return subscriptions.stream()
+				.map(sub -> mapSubscriptionToSummary(sub, sub.getUser()))
+				.collect(Collectors.toList());
 	}
 
 	@Override
 	public List<UserSubscriptionSummaryDto> getSubscriptionsByPackage(Long packageId) {
-		// TODO Auto-generated method stub
-		return null;
+		List<UserSubscription> subscriptions = subscriptionRepository.findByPackageIdWithRelations(packageId);
+		return subscriptions.stream()
+				.map(sub -> mapSubscriptionToSummary(sub, sub.getUser()))
+				.collect(Collectors.toList());
 	}
 
 	@Override
 	public List<UserSubscriptionSummaryDto> getSubscriptionsWithPendingAddons() {
-		// TODO Auto-generated method stub
-		return null;
+		List<UserSubscription> subscriptions = subscriptionRepository.findSubscriptionsWithPendingAddons();
+		return subscriptions.stream()
+				.map(sub -> mapSubscriptionToSummary(sub, sub.getUser()))
+				.collect(Collectors.toList());
 	}
 
 	@Override
 	public long countActiveSubscriptions() {
-		// TODO Auto-generated method stub
-		return 0;
+		return subscriptionRepository.countBySubscriptionStatus(SubscriptionStatus.ACTIVE);
 	}
 
 	@Override
 	public long countTotalAllocatedDoctors() {
-		// TODO Auto-generated method stub
-		return 0;
+		return allocationRepository.countByStatus(AllocationStatus.ACTIVE);
 	}
 
 	@Override

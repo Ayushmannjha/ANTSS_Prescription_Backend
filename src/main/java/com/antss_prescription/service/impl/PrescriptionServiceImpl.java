@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.antss_prescription.dto.response.DetailedPrescriptionResponse;
+import com.antss_prescription.exception.BusinessException;
 import org.springframework.stereotype.Service;
 
 import com.antss_prescription.dto.request.SavePrescriptionRequest;
@@ -30,6 +32,10 @@ import com.antss_prescription.repository.prescription.PrescriptionMedicinesRepo;
 import com.antss_prescription.repository.prescription.PrescriptionRepo;
 import com.antss_prescription.repository.prescription.VitalsRepo;
 import com.antss_prescription.service.PrescriptionService;
+import com.antss_prescription.dto.response.ConsultationResponse;
+import com.antss_prescription.repository.DoctorRepository;
+import com.antss_prescription.repository.UserRepository;
+import com.antss_prescription.enums.UserType;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +53,9 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     private final ConsultationRepo consultationRepository;
     private final PrescriptionRepo prescriptionRepository;
     private final PrescriptionMedicinesRepo prescriptionMedicinesRepository;
+    private final DoctorRepository doctorRepository;
+    private final UserRepository userRepository;
+
 
     // ─────────────────────────────────────────────
     // CREATE
@@ -127,6 +136,22 @@ public class PrescriptionServiceImpl implements PrescriptionService {
         consultation.setFollowUpDate(req.getFollowUpDate());
         consultation.setCreatedAt(LocalDateTime.now());
         consultation.setUpdatedAt(LocalDateTime.now());
+
+        try {
+            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getName() != null) {
+                String email = auth.getName();
+                Consultation finalConsultation = consultation;
+                userRepository.findByEmail(email).ifPresent(user -> {
+                    if (user.getUserType() == UserType.DOCTOR) {
+                        doctorRepository.findByUserId(user.getId()).ifPresent(finalConsultation::setDoctor);
+                    }
+                });
+            }
+        } catch (Exception e) {
+           throw new BusinessException("Prescription not created");
+        }
+
         consultation = consultationRepository.save(consultation);
     }
 
@@ -366,6 +391,119 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                 .medicines(medicines.stream()
                         .map(m -> m.getMedicineName() + " " + m.getStrength())
                         .collect(Collectors.toList()))
+                .build();
+    }
+
+    @Override
+    public DetailedPrescriptionResponse getDetailedPrescriptionById(int prescriptionId) {
+        Prescription prescription = prescriptionRepository
+                .findById(prescriptionId)
+                .orElseThrow(() -> new RuntimeException(
+                        "Prescription not found: " + prescriptionId));
+
+        return buildDetailedResponse(prescription);
+    }
+
+    @Override
+    public List<DetailedPrescriptionResponse> getDetailedPrescriptionsByPatientId(int patientId) {
+        return prescriptionRepository.findByConsultation_Patient_PatientId(patientId)
+                .stream()
+                .map(this::buildDetailedResponse)
+                .collect(Collectors.toList());
+    }
+
+    private DetailedPrescriptionResponse buildDetailedResponse(Prescription prescription) {
+        Consultation consultation = prescription.getConsultation();
+        PatientRegistration registration = consultation.getPatientRegistration();
+        List<PrescriptionMedicines> medicines =
+                prescriptionMedicinesRepository.findByPrescription(prescription);
+
+        ConsultationResponse consultationResponse = new ConsultationResponse();
+        consultationResponse.setConsultationId(consultation.getConsultationId());
+        consultationResponse.setConsultationNumber(consultation.getConsultationNumber());
+        consultationResponse.setAdvice(consultation.getAdvice());
+        consultationResponse.setFollowUpDate(consultation.getFollowUpDate());
+        consultationResponse.setCreatedAt(consultation.getCreatedAt());
+        consultationResponse.setUpdatedAt(consultation.getUpdatedAt());
+
+        if (consultation.getDoctor() != null) {
+            consultationResponse.setDoctorId(consultation.getDoctor().getId());
+            consultationResponse.setDoctorName(consultation.getDoctor().getDoctorName());
+            consultationResponse.setDoctorCode(consultation.getDoctor().getDoctorCode());
+            consultationResponse.setSpecialization(consultation.getDoctor().getSpecialization());
+            consultationResponse.setQualification(consultation.getDoctor().getQualification());
+        }
+
+        if (registration != null) {
+            consultationResponse.setRegistrationId(registration.getRegistrationId());
+            consultationResponse.setRegistrationNumber(registration.getRegistrationNumber());
+        }
+
+        if (consultation.getPatient() != null) {
+            consultationResponse.setPatientId(consultation.getPatient().getPatientId());
+            consultationResponse.setPatientName(consultation.getPatient().getPatientName());
+            consultationResponse.setMobileNumber(consultation.getPatient().getMobileNumber());
+            consultationResponse.setGender(consultation.getPatient().getGender());
+            consultationResponse.setAge(consultation.getPatient().getAge());
+        }
+
+        if (consultation.getCheifComplaints() != null) {
+            consultationResponse.setCheifComplaintId(consultation.getCheifComplaints().getCheifComplaintId());
+            consultationResponse.setComplaintName(consultation.getCheifComplaints().getComplaintName());
+            consultationResponse.setComplaintFrequency(consultation.getCheifComplaints().getFrequency());
+            consultationResponse.setSeverity(consultation.getCheifComplaints().getSev());
+            consultationResponse.setComplaintDuration(consultation.getCheifComplaints().getDuration());
+        }
+
+        if (consultation.getGeneralExamination() != null) {
+            consultationResponse.setGeneralExaminationId(consultation.getGeneralExamination().getGeneralExaminationId());
+            consultationResponse.setGeneralExamination(consultation.getGeneralExamination().getGeneralExamination());
+        }
+
+        if (consultation.getDiagnosis() != null) {
+            consultationResponse.setDiagnosisId(consultation.getDiagnosis().getDiagnosisId());
+            consultationResponse.setDiagnosisName(consultation.getDiagnosis().getDiagnosisName());
+            consultationResponse.setDiagnosisCode(consultation.getDiagnosis().getDiagnosisCode());
+            consultationResponse.setDiagnosisDuration(consultation.getDiagnosis().getDuration());
+        }
+
+        if (consultation.getPastMedicalHistory() != null) {
+            consultationResponse.setHistoryId(consultation.getPastMedicalHistory().getHistoryId());
+            consultationResponse.setAllergies(consultation.getPastMedicalHistory().getAllergeies());
+            consultationResponse.setCurrentMedicine(consultation.getPastMedicalHistory().getCurrentMedicine());
+            consultationResponse.setMedicalHistory(consultation.getPastMedicalHistory().getMedicalHistory());
+        }
+
+        if (consultation.getVitals() != null) {
+            consultationResponse.setVitalId(consultation.getVitals().getVitalId());
+            consultationResponse.setHeight(consultation.getVitals().getHeight());
+            consultationResponse.setWeight(consultation.getVitals().getWeight());
+            consultationResponse.setTemperature(consultation.getVitals().getTemprature());
+            consultationResponse.setPulse(consultation.getVitals().getPulse());
+            consultationResponse.setSpo2(consultation.getVitals().getSpo2());
+            consultationResponse.setBp(consultation.getVitals().getBp());
+            consultationResponse.setRespiratoryRate(consultation.getVitals().getRespiratoryRate());
+        }
+
+        List<DetailedPrescriptionResponse.MedicineDetailResponse> medicineDetails = medicines.stream()
+                .map(m -> DetailedPrescriptionResponse.MedicineDetailResponse.builder()
+                        .prescriptionMedicineId(m.getPrescriptionMedicineId())
+                        .medicineName(m.getMedicineName())
+                        .strength(m.getStrength())
+                        .dosage(m.getDosage())
+                        .frequency(m.getFrequency())
+                        .duration(m.getDuration())
+                        .instruction(m.getInstruction())
+                        .quantity(m.getQuantity())
+                        .build())
+                .collect(Collectors.toList());
+
+        return DetailedPrescriptionResponse.builder()
+                .prescriptionId(prescription.getPrescriptionId())
+                .notes(prescription.getNotes())
+                .createdAt(prescription.getCreatedAt())
+                .consultation(consultationResponse)
+                .medicines(medicineDetails)
                 .build();
     }
 }

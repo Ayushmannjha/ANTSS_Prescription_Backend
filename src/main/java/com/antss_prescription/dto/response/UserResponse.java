@@ -22,4 +22,7 @@ public class UserResponse {
     private Role role;
     private LocalDateTime registrationDate;
     private LocalDateTime createdAt;
+    private UUID doctorId;
+    private Long hospitalId;
+    private Long clinicId;
 }
