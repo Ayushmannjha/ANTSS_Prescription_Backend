@@ -1,20 +1,18 @@
 package com.antss_prescription.entity.prescription;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
+import jakarta.persistence.*;
+import lombok.*;
+
 @Entity
 @Table(name="Patient")
 @Setter
 @Getter
 @ToString
+@AllArgsConstructor
+@NoArgsConstructor
 public class Patient {
 
 	@Id
@@ -31,6 +29,9 @@ public class Patient {
 	private String pincode;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
-	
-	
+
+
+	@OneToMany(mappedBy = "patient", cascade = CascadeType.ALL, orphanRemoval = true)
+	private List<Document> docs;
+
 }
