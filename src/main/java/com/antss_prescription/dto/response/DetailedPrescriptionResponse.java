@@ -27,4 +27,33 @@ public class DetailedPrescriptionResponse {
         private String instruction;
         private String quantity;
     }
+ // In DetailedPrescriptionResponse.java — add these fields
+    private List<InvestigationDetailResponse> investigations;
+    private List<TestRequestedDetailResponse> testRequested;
+
+    @Data
+    @Builder
+    public static class InvestigationDetailResponse {
+        private int id;
+        private String investigationName;
+        private LocalDateTime createdAt;
+    }
+
+    @Data
+    @Builder
+    public static class TestRequestedDetailResponse {
+        private int id;
+        private String testName;
+        private LocalDateTime createdAt;
+    }
+    @Data
+    @Builder
+    public static class DocumentDetailResponse {
+        private int id;
+        private String fileName;
+        private String url;
+    }
+
+    // And the field
+    private List<DocumentDetailResponse> documents;
 }

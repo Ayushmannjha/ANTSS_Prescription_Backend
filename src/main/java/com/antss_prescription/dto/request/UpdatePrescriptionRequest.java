@@ -1,13 +1,14 @@
 package com.antss_prescription.dto.request;
 
 import lombok.Data;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
 public class UpdatePrescriptionRequest {
 
-    // Vitals
+    // --- Vitals ---
     private int height;
     private double weight;
     private double temperature;
@@ -16,32 +17,34 @@ public class UpdatePrescriptionRequest {
     private String bp;
     private double respiratoryRate;
 
-    // Chief Complaint
-    private String complaintName;
-    private String complaintFrequency;
-    private String severity;
-    private String complaintDuration;
+    // --- Chief Complaint ---
+    private List<SavePrescriptionRequest.ChiefComplaintRequest> complaints;
 
-    // General Examination
-    private String generalExamination;
+    // --- General Examination ---
+    private List<String> generalExaminations;
 
-    // Past Medical History
-    private String allergies;
-    private String currentMedicine;
-    private String medicalHistory;
+    // --- Past Medical History ---
+    private List<SavePrescriptionRequest.PastMedicalHistoryRequest> pastMedicalHistories;
 
-    // Diagnosis
-    private String diagnosisName;
-    private String diagnosisCode;
-    private String diagnosisDuration;
+    // --- Diagnosis ---
+    private List<SavePrescriptionRequest.DiagnosisRequest> diagnoses;
 
-    // Consultation
+    // --- Investigation ---
+    private List<SavePrescriptionRequest.InvestigationRequest> investigations;
+
+    // --- Test Requested ---
+    private List<SavePrescriptionRequest.TestRequestedRequest> testRequested;
+
+    // --- Documents ---
+    private List<SavePrescriptionRequest.DocumentRequest> documents;
+
+    // --- Consultation ---
     private String advice;
     private LocalDateTime followUpDate;
 
-    // Prescription
+    // --- Prescription ---
     private String notes;
 
-    // Medicines
+    // --- Medicines ---
     private List<SavePrescriptionRequest.MedicineRequest> medicines;
 }

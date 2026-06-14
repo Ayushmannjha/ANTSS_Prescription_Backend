@@ -1,16 +1,32 @@
 package com.antss_prescription.repository.prescription;
 
-import com.antss_prescription.entity.prescription.Document;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.antss_prescription.entity.prescription.Document;
+
+import jakarta.transaction.Transactional;
 @Repository
 public interface DocumentRepo extends JpaRepository<Document, Long> {
 
-    List<Document> findByPatientId(Integer patientId);
-    Optional<Document> findByIdAndPatientId(Integer documentId, Integer patientId);
-    void deleteByIdAndPatientId(Integer documentId, Integer patientId);
+    @Query("SELECT d FROM Document d WHERE d.patient.patientId = :patientId")
+    List<Document> findByPatientId(@Param("patientId") Integer patientId);
+
+    @Query("SELECT d FROM Document d WHERE d.id = :documentId AND d.patient.patientId = :patientId")
+    Optional<Document> findByIdAndPatientId(@Param("documentId") Integer documentId, @Param("patientId") Integer patientId);
+
+    @Query("DELETE FROM Document d WHERE d.id = :documentId AND d.patient.patientId = :patientId")
+    @Modifying
+    @Transactional
+    void deleteByIdAndPatientId(@Param("documentId") Integer documentId, @Param("patientId") Integer patientId);
+
+	void deleteByPatientPatientId(int patientId);
+
+	List<Document> findByPatientPatientId(int patientId);
 }
