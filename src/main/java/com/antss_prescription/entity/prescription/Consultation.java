@@ -7,6 +7,9 @@ import com.antss_prescription.entity.Doctor;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.List;
+import java.util.ArrayList;
+
 @Entity
 @Table(name = "consultation")
 @Setter @Getter @ToString
@@ -26,21 +29,17 @@ public class Consultation {
     @JoinColumn(name = "registration_id")
     private PatientRegistration patientRegistration;
 
-    @ManyToOne
-    @JoinColumn(name = "cheif_complaint_id")
-    private CheifComplaints cheifComplaints;
+    @OneToMany(mappedBy = "consultation", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CheifComplaints> cheifComplaints = new ArrayList<>();
 
-    @ManyToOne
-    @JoinColumn(name = "general_examination_id")
-    private GeneralExamination generalExamination;
+    @OneToMany(mappedBy = "consultation", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<GeneralExamination> generalExaminations = new ArrayList<>();
 
-    @ManyToOne
-    @JoinColumn(name = "diagnosis_id")
-    private Diagnosis diagnosis;
+    @OneToMany(mappedBy = "consultation", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Diagnosis> diagnoses = new ArrayList<>();
 
-    @ManyToOne
-    @JoinColumn(name = "past_medical_history_id")
-    private PastMedicalHistory pastMedicalHistory;
+    @OneToMany(mappedBy = "consultation", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PastMedicalHistory> pastMedicalHistories = new ArrayList<>();
 
     @ManyToOne
     @JoinColumn(name = "patient_id")

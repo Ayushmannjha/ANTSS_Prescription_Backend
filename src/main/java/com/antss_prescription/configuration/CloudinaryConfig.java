@@ -11,11 +11,11 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class CloudinaryConfig {
 
-    @Value("${cloudinary.key")
+    @Value("${cloudinary.key}")
     private String key;
-    @Value("${cloudinary.secret")
+    @Value("${cloudinary.secret}")
     private String secret;
-    @Value("${cloudinary.cloud-name")
+    @Value("${cloudinary.cloud-name}")
     private String cloud_name;
 
     @Bean

@@ -204,9 +204,13 @@ public class DoctorServiceImpl implements DoctorService {
 
         if (doctor.getHospital() != null) {
             response.setHospitalId(doctor.getHospital().getId());
+            response.setHospitalName(doctor.getHospital().getHospitalName());
+            response.setHospitalAddress(formatAddress(doctor.getHospital().getAddressLine1(), doctor.getHospital().getCity(), doctor.getHospital().getState(), doctor.getHospital().getPincode()));
         }
         if (doctor.getClinic() != null) {
             response.setClinicId(doctor.getClinic().getId());
+            response.setClinicName(doctor.getClinic().getClinicName());
+            response.setClinicAddress(formatAddress(doctor.getClinic().getAddressLine1(), doctor.getClinic().getCity(), doctor.getClinic().getState(), doctor.getClinic().getPincode()));
         }
 
         return response;
@@ -303,7 +307,9 @@ public class DoctorServiceImpl implements DoctorService {
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor", id));
 
         boolean hasAccess = false;
-        if (doctor.getHospital() != null &&
+        if (doctor.getUser() != null && doctor.getUser().getId().equals(userId)) {
+            hasAccess = true;
+        } else if (doctor.getHospital() != null &&
                 (doctor.getHospital().getUser().getId().equals(userId)
                         || doctor.getHospital().getOwner().getId().equals(userId))) {
             hasAccess = true;
@@ -396,11 +402,21 @@ public class DoctorServiceImpl implements DoctorService {
         DoctorResponse res = modelMapper.map(doctor, DoctorResponse.class);
         if (doctor.getHospital() != null) {
             res.setHospitalId(doctor.getHospital().getId());
+            res.setHospitalName(doctor.getHospital().getHospitalName());
+            res.setHospitalAddress(formatAddress(doctor.getHospital().getAddressLine1(), doctor.getHospital().getCity(), doctor.getHospital().getState(), doctor.getHospital().getPincode()));
         }
         if (doctor.getClinic() != null) {
             res.setClinicId(doctor.getClinic().getId());
+            res.setClinicName(doctor.getClinic().getClinicName());
+            res.setClinicAddress(formatAddress(doctor.getClinic().getAddressLine1(), doctor.getClinic().getCity(), doctor.getClinic().getState(), doctor.getClinic().getPincode()));
         }
         return res;
+    }
+
+    private String formatAddress(String line1, String city, String state, String pin) {
+        return java.util.stream.Stream.of(line1, city, state, pin)
+                .filter(s -> s != null && !s.trim().isEmpty())
+                .collect(java.util.stream.Collectors.joining(", "));
     }
 
     private String generateUniqueDoctorCode() {

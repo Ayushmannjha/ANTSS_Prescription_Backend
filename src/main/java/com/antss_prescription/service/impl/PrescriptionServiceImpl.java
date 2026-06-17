@@ -122,87 +122,6 @@ public class PrescriptionServiceImpl implements PrescriptionService {
             vitals = vitalsRepository.save(vitals);
 
             // =========================
-            // Chief Complaints (List)
-            // =========================
-
-            CheifComplaints savedComplaint = null;
-
-            if (req.getComplaints() != null) {
-
-                for (SavePrescriptionRequest.ChiefComplaintRequest c
-                        : req.getComplaints()) {
-
-                    CheifComplaints complaint = new CheifComplaints();
-                    complaint.setComplaintName(c.getComplaintName());
-                    complaint.setFrequency(c.getComplaintFrequency());
-                    complaint.setSev(c.getSeverity());
-                    complaint.setDuration(c.getComplaintDuration());
-                    complaint.setComplaintDate(LocalDateTime.now());
-                    complaint.setCreatedAt(LocalDateTime.now());
-                    complaint.setUpdatedAt(LocalDateTime.now());
-                    savedComplaint = cheifComplaintsRepository.save(complaint);
-                }
-            }
-
-            // =========================
-            // General Examination (List)
-            // =========================
-
-            GeneralExamination savedExamination = null;
-
-            if (req.getGeneralExaminations() != null) {
-
-                for (String exam : req.getGeneralExaminations()) {
-
-                    GeneralExamination examination = new GeneralExamination();
-                    examination.setGeneralExamination(exam);
-                    savedExamination = generalExaminationRepository.save(examination);
-                }
-            }
-
-            // =========================
-            // Past Medical History (List)
-            // =========================
-
-            PastMedicalHistory savedHistory = null;
-
-            if (req.getPastMedicalHistories() != null) {
-
-                for (SavePrescriptionRequest.PastMedicalHistoryRequest h
-                        : req.getPastMedicalHistories()) {
-
-                    PastMedicalHistory history = new PastMedicalHistory();
-                    history.setAllergeies(h.getAllergies());
-                    history.setCurrentMedicine(h.getCurrentMedicine());
-                    history.setMedicalHistory(h.getMedicalHistory());
-                    history.setCreatedAt(LocalDateTime.now());
-                    history.setUpdatedAt(LocalDateTime.now());
-                    savedHistory = pastMedicalHistoryRepository.save(history);
-                }
-            }
-
-            // =========================
-            // Diagnosis (List)
-            // =========================
-
-            Diagnosis savedDiagnosis = null;
-
-            if (req.getDiagnoses() != null) {
-
-                for (SavePrescriptionRequest.DiagnosisRequest d
-                        : req.getDiagnoses()) {
-
-                    Diagnosis diagnosis = new Diagnosis();
-                    diagnosis.setDiagnosisName(d.getDiagnosisName());
-                    diagnosis.setDiagnosisCode(d.getDiagnosisCode());
-                    diagnosis.setDuration(d.getDiagnosisDuration());
-                    diagnosis.setDiagnosisDate(LocalDateTime.now());
-                    diagnosis.setCreatedAt(LocalDateTime.now());
-                    diagnosis.setUpdatedAt(LocalDateTime.now());
-                    savedDiagnosis = diagnosisRepository.save(diagnosis);
-                }
-            }
-
             // =========================
             // Consultation
             // =========================
@@ -216,14 +135,77 @@ public class PrescriptionServiceImpl implements PrescriptionService {
             consultation.setPatientRegistration(registration);
             consultation.setPatient(registration.getPatient());
             consultation.setVitals(vitals);
-            consultation.setCheifComplaints(savedComplaint);
-            consultation.setGeneralExamination(savedExamination);
-            consultation.setPastMedicalHistory(savedHistory);
-            consultation.setDiagnosis(savedDiagnosis);
             consultation.setAdvice(req.getAdvice());
             consultation.setFollowUpDate(req.getFollowUpDate());
             consultation.setCreatedAt(LocalDateTime.now());
             consultation.setUpdatedAt(LocalDateTime.now());
+
+            // =========================
+            // Chief Complaints (List)
+            // =========================
+
+            if (req.getComplaints() != null) {
+                for (SavePrescriptionRequest.ChiefComplaintRequest c : req.getComplaints()) {
+                    CheifComplaints complaint = new CheifComplaints();
+                    complaint.setComplaintName(c.getComplaintName());
+                    complaint.setFrequency(c.getComplaintFrequency());
+                    complaint.setSev(c.getSeverity());
+                    complaint.setDuration(c.getComplaintDuration());
+                    complaint.setComplaintDate(LocalDateTime.now());
+                    complaint.setCreatedAt(LocalDateTime.now());
+                    complaint.setUpdatedAt(LocalDateTime.now());
+                    complaint.setConsultation(consultation);
+                    consultation.getCheifComplaints().add(complaint);
+                }
+            }
+
+            // =========================
+            // General Examination (List)
+            // =========================
+
+            if (req.getGeneralExaminations() != null) {
+                for (String exam : req.getGeneralExaminations()) {
+                    GeneralExamination examination = new GeneralExamination();
+                    examination.setGeneralExamination(exam);
+                    examination.setConsultation(consultation);
+                    consultation.getGeneralExaminations().add(examination);
+                }
+            }
+
+            // =========================
+            // Past Medical History (List)
+            // =========================
+
+            if (req.getPastMedicalHistories() != null) {
+                for (SavePrescriptionRequest.PastMedicalHistoryRequest h : req.getPastMedicalHistories()) {
+                    PastMedicalHistory history = new PastMedicalHistory();
+                    history.setAllergeies(h.getAllergies());
+                    history.setCurrentMedicine(h.getCurrentMedicine());
+                    history.setMedicalHistory(h.getMedicalHistory());
+                    history.setCreatedAt(LocalDateTime.now());
+                    history.setUpdatedAt(LocalDateTime.now());
+                    history.setConsultation(consultation);
+                    consultation.getPastMedicalHistories().add(history);
+                }
+            }
+
+            // =========================
+            // Diagnosis (List)
+            // =========================
+
+            if (req.getDiagnoses() != null) {
+                for (SavePrescriptionRequest.DiagnosisRequest d : req.getDiagnoses()) {
+                    Diagnosis diagnosis = new Diagnosis();
+                    diagnosis.setDiagnosisName(d.getDiagnosisName());
+                    diagnosis.setDiagnosisCode(d.getDiagnosisCode());
+                    diagnosis.setDuration(d.getDiagnosisDuration());
+                    diagnosis.setDiagnosisDate(LocalDateTime.now());
+                    diagnosis.setCreatedAt(LocalDateTime.now());
+                    diagnosis.setUpdatedAt(LocalDateTime.now());
+                    diagnosis.setConsultation(consultation);
+                    consultation.getDiagnoses().add(diagnosis);
+                }
+            }
 
             // =========================
             // Set Doctor
@@ -306,6 +288,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
 
                 Investigations investigation = new Investigations();
                 investigation.setInestigationName(i.getInvestigationName());
+                investigation.setNotes(i.getNotes());
                 investigation.setPrescription(prescription);
                 investigation.setPatientRegistration(
                         consultation.getPatientRegistration());
@@ -326,6 +309,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
 
                 TestRequested testRequested = new TestRequested();
                 testRequested.setTestName(t.getTestName());
+                testRequested.setNotes(t.getNotes());
                 testRequested.setPrescription(prescription);
                 testRequested.setPatientRegistration(
                         consultation.getPatientRegistration());
@@ -485,14 +469,9 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
     // =========================
 
     if (req.getComplaints() != null) {
-
-        cheifComplaintsRepository.delete(consultation.getCheifComplaints());
-
-        CheifComplaints savedComplaint = null;
-
+        consultation.getCheifComplaints().clear();
         for (SavePrescriptionRequest.ChiefComplaintRequest c
                 : req.getComplaints()) {
-
             CheifComplaints complaint = new CheifComplaints();
             complaint.setComplaintName(c.getComplaintName());
             complaint.setFrequency(c.getComplaintFrequency());
@@ -501,10 +480,9 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
             complaint.setComplaintDate(LocalDateTime.now());
             complaint.setCreatedAt(LocalDateTime.now());
             complaint.setUpdatedAt(LocalDateTime.now());
-            savedComplaint = cheifComplaintsRepository.save(complaint);
+            complaint.setConsultation(consultation);
+            consultation.getCheifComplaints().add(complaint);
         }
-
-        consultation.setCheifComplaints(savedComplaint);
     }
 
     // =========================
@@ -512,19 +490,13 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
     // =========================
 
     if (req.getGeneralExaminations() != null) {
-
-        generalExaminationRepository.delete(consultation.getGeneralExamination());
-
-        GeneralExamination savedExamination = null;
-
+        consultation.getGeneralExaminations().clear();
         for (String exam : req.getGeneralExaminations()) {
-
             GeneralExamination examination = new GeneralExamination();
             examination.setGeneralExamination(exam);
-            savedExamination = generalExaminationRepository.save(examination);
+            examination.setConsultation(consultation);
+            consultation.getGeneralExaminations().add(examination);
         }
-
-        consultation.setGeneralExamination(savedExamination);
     }
 
     // =========================
@@ -532,24 +504,18 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
     // =========================
 
     if (req.getPastMedicalHistories() != null) {
-
-        pastMedicalHistoryRepository.delete(consultation.getPastMedicalHistory());
-
-        PastMedicalHistory savedHistory = null;
-
+        consultation.getPastMedicalHistories().clear();
         for (SavePrescriptionRequest.PastMedicalHistoryRequest h
                 : req.getPastMedicalHistories()) {
-
             PastMedicalHistory history = new PastMedicalHistory();
             history.setAllergeies(h.getAllergies());
             history.setCurrentMedicine(h.getCurrentMedicine());
             history.setMedicalHistory(h.getMedicalHistory());
             history.setCreatedAt(LocalDateTime.now());
             history.setUpdatedAt(LocalDateTime.now());
-            savedHistory = pastMedicalHistoryRepository.save(history);
+            history.setConsultation(consultation);
+            consultation.getPastMedicalHistories().add(history);
         }
-
-        consultation.setPastMedicalHistory(savedHistory);
     }
 
     // =========================
@@ -557,14 +523,9 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
     // =========================
 
     if (req.getDiagnoses() != null) {
-
-        diagnosisRepository.delete(consultation.getDiagnosis());
-
-        Diagnosis savedDiagnosis = null;
-
+        consultation.getDiagnoses().clear();
         for (SavePrescriptionRequest.DiagnosisRequest d
                 : req.getDiagnoses()) {
-
             Diagnosis diagnosis = new Diagnosis();
             diagnosis.setDiagnosisName(d.getDiagnosisName());
             diagnosis.setDiagnosisCode(d.getDiagnosisCode());
@@ -572,10 +533,9 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
             diagnosis.setDiagnosisDate(LocalDateTime.now());
             diagnosis.setCreatedAt(LocalDateTime.now());
             diagnosis.setUpdatedAt(LocalDateTime.now());
-            savedDiagnosis = diagnosisRepository.save(diagnosis);
+            diagnosis.setConsultation(consultation);
+            consultation.getDiagnoses().add(diagnosis);
         }
-
-        consultation.setDiagnosis(savedDiagnosis);
     }
 
     // =========================
@@ -731,16 +691,16 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
             vitalsRepository.delete(consultation.getVitals());
 
         if (consultation.getCheifComplaints() != null)
-            cheifComplaintsRepository.delete(consultation.getCheifComplaints());
+            cheifComplaintsRepository.deleteAll(consultation.getCheifComplaints());
 
-        if (consultation.getGeneralExamination() != null)
-            generalExaminationRepository.delete(consultation.getGeneralExamination());
+        if (consultation.getGeneralExaminations() != null)
+            generalExaminationRepository.deleteAll(consultation.getGeneralExaminations());
 
-        if (consultation.getPastMedicalHistory() != null)
-            pastMedicalHistoryRepository.delete(consultation.getPastMedicalHistory());
+        if (consultation.getPastMedicalHistories() != null)
+            pastMedicalHistoryRepository.deleteAll(consultation.getPastMedicalHistories());
 
-        if (consultation.getDiagnosis() != null)
-            diagnosisRepository.delete(consultation.getDiagnosis());
+        if (consultation.getDiagnoses() != null)
+            diagnosisRepository.deleteAll(consultation.getDiagnoses());
 
         consultationRepository.delete(consultation);
     }
@@ -887,58 +847,86 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
         // Chief Complaints
         // =========================
 
-        if (consultation.getCheifComplaints() != null) {
-            consultationResponse.setCheifComplaintId(
-                    consultation.getCheifComplaints().getCheifComplaintId());
-            consultationResponse.setComplaintName(
-                    consultation.getCheifComplaints().getComplaintName());
-            consultationResponse.setComplaintFrequency(
-                    consultation.getCheifComplaints().getFrequency());
-            consultationResponse.setSeverity(
-                    consultation.getCheifComplaints().getSev());
-            consultationResponse.setComplaintDuration(
-                    consultation.getCheifComplaints().getDuration());
+        if (consultation.getCheifComplaints() != null && !consultation.getCheifComplaints().isEmpty()) {
+            CheifComplaints first = consultation.getCheifComplaints().get(0);
+            consultationResponse.setCheifComplaintId(first.getCheifComplaintId());
+            consultationResponse.setComplaintName(first.getComplaintName());
+            consultationResponse.setComplaintFrequency(first.getFrequency());
+            consultationResponse.setSeverity(first.getSev());
+            consultationResponse.setComplaintDuration(first.getDuration());
+
+            List<ConsultationResponse.ChiefComplaintResponse> list = consultation.getCheifComplaints().stream()
+                .map(comp -> {
+                    ConsultationResponse.ChiefComplaintResponse r = new ConsultationResponse.ChiefComplaintResponse();
+                    r.setCheifComplaintId(comp.getCheifComplaintId());
+                    r.setComplaintName(comp.getComplaintName());
+                    r.setComplaintFrequency(comp.getFrequency());
+                    r.setSeverity(comp.getSev());
+                    r.setComplaintDuration(comp.getDuration());
+                    return r;
+                }).collect(Collectors.toList());
+            consultationResponse.setComplaints(list);
         }
 
         // =========================
         // General Examination
         // =========================
 
-        if (consultation.getGeneralExamination() != null) {
-            consultationResponse.setGeneralExaminationId(
-                    consultation.getGeneralExamination().getGeneralExaminationId());
-            consultationResponse.setGeneralExamination(
-                    consultation.getGeneralExamination().getGeneralExamination());
+        if (consultation.getGeneralExaminations() != null && !consultation.getGeneralExaminations().isEmpty()) {
+            GeneralExamination first = consultation.getGeneralExaminations().get(0);
+            consultationResponse.setGeneralExaminationId(first.getGeneralExaminationId());
+            consultationResponse.setGeneralExamination(first.getGeneralExamination());
+
+            List<String> list = consultation.getGeneralExaminations().stream()
+                .map(GeneralExamination::getGeneralExamination)
+                .collect(Collectors.toList());
+            consultationResponse.setGeneralExaminations(list);
         }
 
         // =========================
         // Diagnosis
         // =========================
 
-        if (consultation.getDiagnosis() != null) {
-            consultationResponse.setDiagnosisId(
-                    consultation.getDiagnosis().getDiagnosisId());
-            consultationResponse.setDiagnosisName(
-                    consultation.getDiagnosis().getDiagnosisName());
-            consultationResponse.setDiagnosisCode(
-                    consultation.getDiagnosis().getDiagnosisCode());
-            consultationResponse.setDiagnosisDuration(
-                    consultation.getDiagnosis().getDuration());
+        if (consultation.getDiagnoses() != null && !consultation.getDiagnoses().isEmpty()) {
+            Diagnosis first = consultation.getDiagnoses().get(0);
+            consultationResponse.setDiagnosisId(first.getDiagnosisId());
+            consultationResponse.setDiagnosisName(first.getDiagnosisName());
+            consultationResponse.setDiagnosisCode(first.getDiagnosisCode());
+            consultationResponse.setDiagnosisDuration(first.getDuration());
+
+            List<ConsultationResponse.DiagnosisResponse> list = consultation.getDiagnoses().stream()
+                .map(diag -> {
+                    ConsultationResponse.DiagnosisResponse r = new ConsultationResponse.DiagnosisResponse();
+                    r.setDiagnosisId(diag.getDiagnosisId());
+                    r.setDiagnosisName(diag.getDiagnosisName());
+                    r.setDiagnosisCode(diag.getDiagnosisCode());
+                    r.setDiagnosisDuration(diag.getDuration());
+                    return r;
+                }).collect(Collectors.toList());
+            consultationResponse.setDiagnoses(list);
         }
 
         // =========================
         // Past Medical History
         // =========================
 
-        if (consultation.getPastMedicalHistory() != null) {
-            consultationResponse.setHistoryId(
-                    consultation.getPastMedicalHistory().getHistoryId());
-            consultationResponse.setAllergies(
-                    consultation.getPastMedicalHistory().getAllergeies());
-            consultationResponse.setCurrentMedicine(
-                    consultation.getPastMedicalHistory().getCurrentMedicine());
-            consultationResponse.setMedicalHistory(
-                    consultation.getPastMedicalHistory().getMedicalHistory());
+        if (consultation.getPastMedicalHistories() != null && !consultation.getPastMedicalHistories().isEmpty()) {
+            PastMedicalHistory first = consultation.getPastMedicalHistories().get(0);
+            consultationResponse.setHistoryId(first.getHistoryId());
+            consultationResponse.setAllergies(first.getAllergeies());
+            consultationResponse.setCurrentMedicine(first.getCurrentMedicine());
+            consultationResponse.setMedicalHistory(first.getMedicalHistory());
+
+            List<ConsultationResponse.PastMedicalHistoryResponse> list = consultation.getPastMedicalHistories().stream()
+                .map(hist -> {
+                    ConsultationResponse.PastMedicalHistoryResponse r = new ConsultationResponse.PastMedicalHistoryResponse();
+                    r.setHistoryId(hist.getHistoryId());
+                    r.setAllergies(hist.getAllergeies());
+                    r.setCurrentMedicine(hist.getCurrentMedicine());
+                    r.setMedicalHistory(hist.getMedicalHistory());
+                    return r;
+                }).collect(Collectors.toList());
+            consultationResponse.setPastMedicalHistories(list);
         }
 
         // =========================
@@ -988,6 +976,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                                 .builder()
                                 .id(i.getId())
                                 .investigationName(i.getInestigationName())
+                                .notes(i.getNotes())
                                 .createdAt(i.getCreateAt())
                                 .build())
                         .collect(Collectors.toList());
@@ -1003,6 +992,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                                 .builder()
                                 .id(t.getId())
                                 .testName(t.getTestName())
+                                .notes(t.getNotes())
                                 .createdAt(t.getCreateAt())
                                 .build())
                         .collect(Collectors.toList());

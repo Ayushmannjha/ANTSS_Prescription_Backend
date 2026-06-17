@@ -12,15 +12,15 @@ import com.antss_prescription.entity.prescription.MedicineMaster;
 @Repository
 public interface MedicineMasterRepository extends JpaRepository<MedicineMaster, Long> {
 
-    List<MedicineMaster> findByUserUserId(Long userId);
+    List<MedicineMaster> findByUserId(UUID userId);
 
-    List<MedicineMaster> findByUserUserIdAndMedicineNameContainingIgnoreCase(
+    List<MedicineMaster> findByUserIdAndMedicineNameContainingIgnoreCase(
             UUID userId,
             String keyword
     );
 
-    Optional<MedicineMaster> findByMedicineIdAndUserUserId(
+    Optional<MedicineMaster> findByMedicineIdAndUserId(
             Long medicineId,
-            Long userId
+            UUID userId
     );
 }

@@ -8,7 +8,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.w3c.dom.DocumentType;
 
 import java.util.List;
 
@@ -23,7 +22,7 @@ public class DocumentController {
     public ResponseEntity<DocumentDto> uploadDocument(
             @PathVariable Integer patientId,
             @RequestParam("file") MultipartFile file,
-            @RequestParam("type") DocumentType type) {
+            @RequestParam(value = "type", required = false, defaultValue = "INVESTIGATION") String type) {
 
         DocumentDto document = documentService.uploadDocument(patientId, file, type);
 

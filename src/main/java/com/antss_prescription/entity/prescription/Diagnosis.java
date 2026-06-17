@@ -9,8 +9,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.JoinColumn;
+import lombok.ToString;
+
 @Setter
 @Getter
+@ToString(exclude = "consultation")
 @Entity
 @Table(name = "diagnosis")
 public class Diagnosis {
@@ -24,4 +29,8 @@ public class Diagnosis {
 	private LocalDateTime diagnosisDate;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
+
+	@ManyToOne
+	@JoinColumn(name = "consultation_id")
+	private Consultation consultation;
 }

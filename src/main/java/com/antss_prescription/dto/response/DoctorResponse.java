@@ -21,6 +21,10 @@ public class DoctorResponse {
     private String registrationNumber;
     private String signatureUrl;
     private Long hospitalId;
+    private String hospitalName;
+    private String hospitalAddress;
     private Long clinicId;
+    private String clinicName;
+    private String clinicAddress;
     private EntityStatus status;
 }

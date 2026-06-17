@@ -192,6 +192,7 @@ public class EmailServiceImpl implements EmailService {
             log.info("Email sent to: {}", to);
         } catch (Exception e) {
             log.error("Failed to send email to {}: {}", to, e.getMessage());
+            throw new com.antss_prescription.exception.BusinessException("Failed to send email to " + to + ": " + e.getMessage());
         }
     }
 
@@ -207,6 +208,7 @@ public class EmailServiceImpl implements EmailService {
             log.info("HTML Email sent to: {}", to);
         } catch (Exception e) {
             log.error("Failed to send HTML email to {}: {}", to, e.getMessage());
+            throw new com.antss_prescription.exception.BusinessException("Failed to send HTML email to " + to + ": " + e.getMessage());
         }
     }
 }

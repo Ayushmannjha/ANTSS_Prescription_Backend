@@ -11,11 +11,14 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.JoinColumn;
+
 @Entity
 @Table(name="cheif_complaints")
 @Setter
 @Getter
-@ToString
+@ToString(exclude = "consultation")
 public class CheifComplaints {
 
 	@Id
@@ -28,4 +31,8 @@ public class CheifComplaints {
 	private LocalDateTime complaintDate;
 	private LocalDateTime CreatedAt;
 	private LocalDateTime updatedAt;
+
+	@ManyToOne
+	@JoinColumn(name = "consultation_id")
+	private Consultation consultation;
 }

@@ -8,6 +8,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Entity
 @Builder
 @AllArgsConstructor
@@ -23,9 +25,12 @@ public class Document {
     private String fileName;
     private String url;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "patient_id")
     private Patient patient;
+
+    @JsonIgnore
     @ManyToOne
 	@JoinColumn(name = "prescription_id")
 	private Prescription prescription;

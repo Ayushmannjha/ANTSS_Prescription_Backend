@@ -36,6 +36,7 @@ public class HospitalServiceImpl implements HospitalService {
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
     private final ModelMapper modelMapper;
+    private final DoctorRepository doctorRepository;
 
     public HospitalServiceImpl(HospitalRepository hospitalRepository,
                                UserRepository userRepository,
@@ -43,7 +44,8 @@ public class HospitalServiceImpl implements HospitalService {
                                LoginCredentialRepository loginCredentialRepository,
                                EmailService emailService,
                                PasswordEncoder passwordEncoder,
-                               ModelMapper modelMapper) {
+                               ModelMapper modelMapper,
+                               DoctorRepository doctorRepository) {
         this.hospitalRepository = hospitalRepository;
         this.userRepository = userRepository;
         this.userSubscriptionRepository = userSubscriptionRepository;
@@ -51,6 +53,7 @@ public class HospitalServiceImpl implements HospitalService {
         this.emailService = emailService;
         this.passwordEncoder = passwordEncoder;
         this.modelMapper = modelMapper;
+        this.doctorRepository = doctorRepository;
     }
 
     @Override
@@ -141,7 +144,16 @@ public class HospitalServiceImpl implements HospitalService {
     public HospitalResponse getHospitalById(Long id, UUID userId) {
         Hospital hospital = hospitalRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hospital", id));
-        if (!hospital.getUser().getId().equals(userId)) {
+        
+        boolean hasAccess = hospital.getUser().getId().equals(userId);
+        if (!hasAccess) {
+            // Check if user is a doctor of this hospital
+            hasAccess = doctorRepository.findByUserId(userId)
+                    .map(doctor -> doctor.getHospital() != null && doctor.getHospital().getId().equals(id))
+                    .orElse(false);
+        }
+
+        if (!hasAccess) {
             throw new BusinessException("Unauthorized access to hospital resource");
         }
         return modelMapper.map(hospital, HospitalResponse.class);

@@ -36,6 +36,7 @@ public class DetailedPrescriptionResponse {
     public static class InvestigationDetailResponse {
         private int id;
         private String investigationName;
+        private String notes;
         private LocalDateTime createdAt;
     }
 
@@ -44,6 +45,7 @@ public class DetailedPrescriptionResponse {
     public static class TestRequestedDetailResponse {
         private int id;
         private String testName;
+        private String notes;
         private LocalDateTime createdAt;
     }
     @Data

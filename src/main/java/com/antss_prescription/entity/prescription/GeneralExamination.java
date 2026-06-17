@@ -11,15 +11,21 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+import jakarta.persistence.ManyToOne;
+
 @Entity
 @Table(name="general_examination")
 @Setter
 @Getter
-@ToString
+@ToString(exclude = "consultation")
 public class GeneralExamination {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private int generalExaminationId;
 	private String generalExamination;
+
+	@ManyToOne
+	@JoinColumn(name = "consultation_id")
+	private Consultation consultation;
 }

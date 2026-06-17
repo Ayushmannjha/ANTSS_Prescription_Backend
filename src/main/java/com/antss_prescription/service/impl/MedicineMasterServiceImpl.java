@@ -37,10 +37,10 @@ public class MedicineMasterServiceImpl implements MedicineMasterService {
     }
 
     @Override
-    public MedicineMaster getMedicineById(Long medicineId, Long userId) {
+    public MedicineMaster getMedicineById(Long medicineId, UUID userId) {
 
         return medicineRepository
-                .findByMedicineIdAndUserUserId(medicineId, userId)
+                .findByMedicineIdAndUserId(medicineId, userId)
                 .orElseThrow(() -> new RuntimeException("Medicine not found"));
     }
 
@@ -48,23 +48,23 @@ public class MedicineMasterServiceImpl implements MedicineMasterService {
     public List<MedicineMaster> searchMedicine(String keyword, UUID userId) {
 
         return medicineRepository
-                .findByUserUserIdAndMedicineNameContainingIgnoreCase(
+                .findByUserIdAndMedicineNameContainingIgnoreCase(
                         userId,
                         keyword
                 );
     }
 
     @Override
-    public List<MedicineMaster> getAllMedicines(Long userId) {
+    public List<MedicineMaster> getAllMedicines(UUID userId) {
 
-        return medicineRepository.findByUserUserId(userId);
+        return medicineRepository.findByUserId(userId);
     }
 
     @Override
-    public void deleteMedicine(Long medicineId, Long userId) {
+    public void deleteMedicine(Long medicineId, UUID userId) {
 
         MedicineMaster medicine = medicineRepository
-                .findByMedicineIdAndUserUserId(medicineId, userId)
+                .findByMedicineIdAndUserId(medicineId, userId)
                 .orElseThrow(() -> new RuntimeException("Medicine not found"));
 
         medicineRepository.delete(medicine);
