@@ -16,6 +16,20 @@ public class ConsultationResponse {
     private String doctorCode;
     private String specialization;
     private String qualification;
+    private String doctorRegistrationNo;
+    private String doctorSignatureUrl;
+
+    // Clinic
+    private Long clinicId;
+    private String clinicName;
+    private String clinicAddress;
+    private String clinicPhone;
+    
+    // Hospital
+    private Long hospitalId;
+    private String hospitalName;
+    private String hospitalAddress;
+    private String hospitalPhone;
 
     // Patient Registration
     private int registrationId;
@@ -27,6 +41,7 @@ public class ConsultationResponse {
     private String mobileNumber;
     private String gender;
     private int age;
+    private String patientAddress;
 
     // Chief Complaint
     private int cheifComplaintId;
@@ -66,4 +81,35 @@ public class ConsultationResponse {
     private LocalDateTime followUpDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // Lists for array representations
+    private java.util.List<ChiefComplaintResponse> complaints;
+    private java.util.List<String> generalExaminations;
+    private java.util.List<DiagnosisResponse> diagnoses;
+    private java.util.List<PastMedicalHistoryResponse> pastMedicalHistories;
+
+    @lombok.Data
+    public static class ChiefComplaintResponse {
+        private int cheifComplaintId;
+        private String complaintName;
+        private String complaintFrequency;
+        private String severity;
+        private String complaintDuration;
+    }
+
+    @lombok.Data
+    public static class DiagnosisResponse {
+        private int diagnosisId;
+        private String diagnosisName;
+        private String diagnosisCode;
+        private String diagnosisDuration;
+    }
+
+    @lombok.Data
+    public static class PastMedicalHistoryResponse {
+        private int historyId;
+        private String allergies;
+        private String currentMedicine;
+        private String medicalHistory;
+    }
 }

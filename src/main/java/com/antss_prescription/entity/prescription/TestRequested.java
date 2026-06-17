@@ -21,6 +21,7 @@ public class TestRequested {
     private int id;
 
     private String testName;
+    private String notes;
 
     @ManyToOne
     @JoinColumn(name = "registration_number")

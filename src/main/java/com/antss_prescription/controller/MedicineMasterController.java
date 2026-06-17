@@ -40,7 +40,7 @@ public class MedicineMasterController {
     @GetMapping("/{id}")
     public ResponseEntity<MedicineMaster> getMedicineById(
             @PathVariable Long id,
-            @RequestParam Long userId) {
+            @RequestParam UUID userId) {
 
         return ResponseEntity.ok(
                 medicineService.getMedicineById(id, userId));
@@ -48,7 +48,7 @@ public class MedicineMasterController {
 
     @GetMapping
     public ResponseEntity<List<MedicineMaster>> getAllMedicines(
-            @RequestParam Long userId) {
+            @RequestParam UUID userId) {
 
         return ResponseEntity.ok(
                 medicineService.getAllMedicines(userId));
@@ -66,7 +66,7 @@ public class MedicineMasterController {
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteMedicine(
             @PathVariable Long id,
-            @RequestParam Long userId) {
+            @RequestParam UUID userId) {
 
         medicineService.deleteMedicine(id, userId);
 

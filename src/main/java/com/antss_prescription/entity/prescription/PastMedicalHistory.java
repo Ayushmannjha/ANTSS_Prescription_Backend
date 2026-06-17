@@ -14,11 +14,13 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+import jakarta.persistence.ManyToOne;
+
 @Entity
 @Table(name="past_medical_history")
 @Setter
 @Getter
-@ToString
+@ToString(exclude = "consultation")
 public class PastMedicalHistory {
 
 	@Id
@@ -30,4 +32,8 @@ public class PastMedicalHistory {
 	private String medicalHistory;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
+
+	@ManyToOne
+	@JoinColumn(name = "consultation_id")
+	private Consultation consultation;
 }

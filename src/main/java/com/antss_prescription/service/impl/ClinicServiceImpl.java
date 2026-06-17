@@ -36,6 +36,7 @@ public class ClinicServiceImpl implements ClinicService {
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
     private final ModelMapper modelMapper;
+    private final DoctorRepository doctorRepository;
 
     public ClinicServiceImpl(ClinicRepository clinicRepository,
                              UserRepository userRepository,
@@ -43,7 +44,8 @@ public class ClinicServiceImpl implements ClinicService {
                              LoginCredentialRepository loginCredentialRepository,
                              EmailService emailService,
                              PasswordEncoder passwordEncoder,
-                             ModelMapper modelMapper) {
+                             ModelMapper modelMapper,
+                             DoctorRepository doctorRepository) {
         this.clinicRepository = clinicRepository;
         this.userRepository = userRepository;
         this.userSubscriptionRepository = userSubscriptionRepository;
@@ -51,6 +53,7 @@ public class ClinicServiceImpl implements ClinicService {
         this.emailService = emailService;
         this.passwordEncoder = passwordEncoder;
         this.modelMapper = modelMapper;
+        this.doctorRepository = doctorRepository;
     }
 
     @Override
@@ -142,7 +145,16 @@ public class ClinicServiceImpl implements ClinicService {
     public ClinicResponse getClinicById(Long id, UUID userId) {
         Clinic clinic = clinicRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Clinic", id));
-        if (!clinic.getUser().getId().equals(userId)) {
+        
+        boolean hasAccess = clinic.getUser().getId().equals(userId);
+        if (!hasAccess) {
+            // Check if user is a doctor of this clinic
+            hasAccess = doctorRepository.findByUserId(userId)
+                    .map(doctor -> doctor.getClinic() != null && doctor.getClinic().getId().equals(id))
+                    .orElse(false);
+        }
+
+        if (!hasAccess) {
             throw new BusinessException("Unauthorized access to clinic resource");
         }
         return modelMapper.map(clinic, ClinicResponse.class);

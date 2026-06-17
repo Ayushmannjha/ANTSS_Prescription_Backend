@@ -2,8 +2,11 @@ package com.antss_prescription.service.impl;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -60,38 +63,38 @@ public class ConsultationServiceImpl implements ConsultationService {
 
         // Save Chief Complaints
         if (consultation.getCheifComplaints() != null) {
-            CheifComplaints complaint = consultation.getCheifComplaints();
-            complaint.setComplaintDate(LocalDateTime.now());
-            complaint.setCreatedAt(LocalDateTime.now());
-            complaint.setUpdatedAt(LocalDateTime.now());
-            complaint = cheifComplaintsRepository.save(complaint);
-            consultation.setCheifComplaints(complaint);
+            for (CheifComplaints complaint : consultation.getCheifComplaints()) {
+                complaint.setComplaintDate(LocalDateTime.now());
+                complaint.setCreatedAt(LocalDateTime.now());
+                complaint.setUpdatedAt(LocalDateTime.now());
+                complaint.setConsultation(consultation);
+            }
         }
 
         // Save General Examination
-        if (consultation.getGeneralExamination() != null) {
-            GeneralExamination examination = consultation.getGeneralExamination();
-            examination = generalExaminationRepository.save(examination);
-            consultation.setGeneralExamination(examination);
+        if (consultation.getGeneralExaminations() != null) {
+            for (GeneralExamination examination : consultation.getGeneralExaminations()) {
+                examination.setConsultation(consultation);
+            }
         }
 
         // Save Diagnosis
-        if (consultation.getDiagnosis() != null) {
-            Diagnosis diagnosis = consultation.getDiagnosis();
-            diagnosis.setDiagnosisDate(LocalDateTime.now());
-            diagnosis.setCreatedAt(LocalDateTime.now());
-            diagnosis.setUpdatedAt(LocalDateTime.now());
-            diagnosis = diagnosisRepository.save(diagnosis);
-            consultation.setDiagnosis(diagnosis);
+        if (consultation.getDiagnoses() != null) {
+            for (Diagnosis diagnosis : consultation.getDiagnoses()) {
+                diagnosis.setDiagnosisDate(LocalDateTime.now());
+                diagnosis.setCreatedAt(LocalDateTime.now());
+                diagnosis.setUpdatedAt(LocalDateTime.now());
+                diagnosis.setConsultation(consultation);
+            }
         }
 
         // Save Past Medical History
-        if (consultation.getPastMedicalHistory() != null) {
-            PastMedicalHistory history = consultation.getPastMedicalHistory();
-            history.setCreatedAt(LocalDateTime.now());
-            history.setUpdatedAt(LocalDateTime.now());
-            history = pastMedicalHistoryRepository.save(history);
-            consultation.setPastMedicalHistory(history);
+        if (consultation.getPastMedicalHistories() != null) {
+            for (PastMedicalHistory history : consultation.getPastMedicalHistories()) {
+                history.setCreatedAt(LocalDateTime.now());
+                history.setUpdatedAt(LocalDateTime.now());
+                history.setConsultation(consultation);
+            }
         }
 
         // Save Vitals
@@ -136,14 +139,19 @@ public class ConsultationServiceImpl implements ConsultationService {
     // ─────────────────────────────────────────────
     @Override
     public List<ConsultationResponse> getConsultationsByDoctor(UUID doctorId) {
-        Doctor doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new RuntimeException(
-                        "Doctor not found with id : " + doctorId));
-        List<ConsultationResponse> responses = new ArrayList<>();
-        for (Consultation c : consultationRepo.findByDoctor(doctor)) {
-            responses.add(mapToResponse(c));
+        List<ConsultationResponse> all = consultationRepo
+                .findByDoctorIdOrderByCreatedAtDesc(doctorId) // or your existing fetch method
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+
+        // Keep only the latest consultation per patient
+        Map<Long, ConsultationResponse> latestPerPatient = new LinkedHashMap<>();
+        for (ConsultationResponse response : all) {
+            latestPerPatient.putIfAbsent((long) response.getPatientId(), response);
         }
-        return responses;
+
+        return new ArrayList<>(latestPerPatient.values());
     }
 
     // ─────────────────────────────────────────────
@@ -152,40 +160,59 @@ public class ConsultationServiceImpl implements ConsultationService {
     @Override
     @Transactional
     public ConsultationResponse updateConsultation(Integer consultationId,
-                                                    Consultation consultation) {
+            Consultation consultation) {
         Consultation existing = consultationRepo.findById(consultationId)
                 .orElseThrow(() -> new RuntimeException(
                         "Consultation not found with id : " + consultationId));
 
         // Update Chief Complaints
         if (consultation.getCheifComplaints() != null) {
-            CheifComplaints complaint = consultation.getCheifComplaints();
-            complaint.setUpdatedAt(LocalDateTime.now());
-            complaint = cheifComplaintsRepository.save(complaint);
-            existing.setCheifComplaints(complaint);
+            existing.getCheifComplaints().clear();
+            for (CheifComplaints complaint : consultation.getCheifComplaints()) {
+                if (complaint.getCreatedAt() == null) {
+                    complaint.setCreatedAt(LocalDateTime.now());
+                    complaint.setComplaintDate(LocalDateTime.now());
+                }
+                complaint.setUpdatedAt(LocalDateTime.now());
+                complaint.setConsultation(existing);
+                existing.getCheifComplaints().add(complaint);
+            }
         }
 
         // Update General Examination
-        if (consultation.getGeneralExamination() != null) {
-            GeneralExamination examination = generalExaminationRepository
-                    .save(consultation.getGeneralExamination());
-            existing.setGeneralExamination(examination);
+        if (consultation.getGeneralExaminations() != null) {
+            existing.getGeneralExaminations().clear();
+            for (GeneralExamination exam : consultation.getGeneralExaminations()) {
+                exam.setConsultation(existing);
+                existing.getGeneralExaminations().add(exam);
+            }
         }
 
         // Update Diagnosis
-        if (consultation.getDiagnosis() != null) {
-            Diagnosis diagnosis = consultation.getDiagnosis();
-            diagnosis.setUpdatedAt(LocalDateTime.now());
-            diagnosis = diagnosisRepository.save(diagnosis);
-            existing.setDiagnosis(diagnosis);
+        if (consultation.getDiagnoses() != null) {
+            existing.getDiagnoses().clear();
+            for (Diagnosis diagnosis : consultation.getDiagnoses()) {
+                if (diagnosis.getCreatedAt() == null) {
+                    diagnosis.setCreatedAt(LocalDateTime.now());
+                    diagnosis.setDiagnosisDate(LocalDateTime.now());
+                }
+                diagnosis.setUpdatedAt(LocalDateTime.now());
+                diagnosis.setConsultation(existing);
+                existing.getDiagnoses().add(diagnosis);
+            }
         }
 
         // Update Past Medical History
-        if (consultation.getPastMedicalHistory() != null) {
-            PastMedicalHistory history = consultation.getPastMedicalHistory();
-            history.setUpdatedAt(LocalDateTime.now());
-            history = pastMedicalHistoryRepository.save(history);
-            existing.setPastMedicalHistory(history);
+        if (consultation.getPastMedicalHistories() != null) {
+            existing.getPastMedicalHistories().clear();
+            for (PastMedicalHistory history : consultation.getPastMedicalHistories()) {
+                if (history.getCreatedAt() == null) {
+                    history.setCreatedAt(LocalDateTime.now());
+                }
+                history.setUpdatedAt(LocalDateTime.now());
+                history.setConsultation(existing);
+                existing.getPastMedicalHistories().add(history);
+            }
         }
 
         // Update Vitals
@@ -235,6 +262,29 @@ public class ConsultationServiceImpl implements ConsultationService {
             response.setDoctorCode(c.getDoctor().getDoctorCode());
             response.setSpecialization(c.getDoctor().getSpecialization());
             response.setQualification(c.getDoctor().getQualification());
+            response.setDoctorRegistrationNo(c.getDoctor().getRegistrationNumber());
+            response.setDoctorSignatureUrl(c.getDoctor().getSignatureUrl());
+
+            if (c.getDoctor().getClinic() != null) {
+                response.setClinicId(c.getDoctor().getClinic().getId());
+                response.setClinicName(c.getDoctor().getClinic().getClinicName());
+                response.setClinicPhone(c.getDoctor().getClinic().getMobileNumber());
+                response.setClinicAddress(formatAddress(
+                        c.getDoctor().getClinic().getAddressLine1(),
+                        c.getDoctor().getClinic().getCity(),
+                        c.getDoctor().getClinic().getState(),
+                        c.getDoctor().getClinic().getPincode()));
+            }
+            if (c.getDoctor().getHospital() != null) {
+                response.setHospitalId(c.getDoctor().getHospital().getId());
+                response.setHospitalName(c.getDoctor().getHospital().getHospitalName());
+                response.setHospitalPhone(c.getDoctor().getHospital().getMobileNumber());
+                response.setHospitalAddress(formatAddress(
+                        c.getDoctor().getHospital().getAddressLine1(),
+                        c.getDoctor().getHospital().getCity(),
+                        c.getDoctor().getHospital().getState(),
+                        c.getDoctor().getHospital().getPincode()));
+            }
         }
 
         if (c.getPatientRegistration() != null) {
@@ -248,33 +298,81 @@ public class ConsultationServiceImpl implements ConsultationService {
             response.setMobileNumber(c.getPatient().getMobileNumber());
             response.setGender(c.getPatient().getGender());
             response.setAge(c.getPatient().getAge());
+            response.setPatientAddress(formatAddress(
+                    c.getPatient().getAddress(),
+                    c.getPatient().getCity(),
+                    c.getPatient().getState(),
+                    c.getPatient().getPincode()));
         }
 
-        if (c.getCheifComplaints() != null) {
-            response.setCheifComplaintId(c.getCheifComplaints().getCheifComplaintId());
-            response.setComplaintName(c.getCheifComplaints().getComplaintName());
-            response.setComplaintFrequency(c.getCheifComplaints().getFrequency());
-            response.setSeverity(c.getCheifComplaints().getSev());
-            response.setComplaintDuration(c.getCheifComplaints().getDuration());
+        if (c.getCheifComplaints() != null && !c.getCheifComplaints().isEmpty()) {
+            CheifComplaints first = c.getCheifComplaints().get(0);
+            response.setCheifComplaintId(first.getCheifComplaintId());
+            response.setComplaintName(first.getComplaintName());
+            response.setComplaintFrequency(first.getFrequency());
+            response.setSeverity(first.getSev());
+            response.setComplaintDuration(first.getDuration());
+
+            List<ConsultationResponse.ChiefComplaintResponse> list = c.getCheifComplaints().stream()
+                .map(comp -> {
+                    ConsultationResponse.ChiefComplaintResponse r = new ConsultationResponse.ChiefComplaintResponse();
+                    r.setCheifComplaintId(comp.getCheifComplaintId());
+                    r.setComplaintName(comp.getComplaintName());
+                    r.setComplaintFrequency(comp.getFrequency());
+                    r.setSeverity(comp.getSev());
+                    r.setComplaintDuration(comp.getDuration());
+                    return r;
+                }).collect(Collectors.toList());
+            response.setComplaints(list);
         }
 
-        if (c.getGeneralExamination() != null) {
-            response.setGeneralExaminationId(c.getGeneralExamination().getGeneralExaminationId());
-            response.setGeneralExamination(c.getGeneralExamination().getGeneralExamination());
+        if (c.getGeneralExaminations() != null && !c.getGeneralExaminations().isEmpty()) {
+            GeneralExamination first = c.getGeneralExaminations().get(0);
+            response.setGeneralExaminationId(first.getGeneralExaminationId());
+            response.setGeneralExamination(first.getGeneralExamination());
+
+            List<String> list = c.getGeneralExaminations().stream()
+                .map(GeneralExamination::getGeneralExamination)
+                .collect(Collectors.toList());
+            response.setGeneralExaminations(list);
         }
 
-        if (c.getDiagnosis() != null) {
-            response.setDiagnosisId(c.getDiagnosis().getDiagnosisId());
-            response.setDiagnosisName(c.getDiagnosis().getDiagnosisName());
-            response.setDiagnosisCode(c.getDiagnosis().getDiagnosisCode());
-            response.setDiagnosisDuration(c.getDiagnosis().getDuration());
+        if (c.getDiagnoses() != null && !c.getDiagnoses().isEmpty()) {
+            Diagnosis first = c.getDiagnoses().get(0);
+            response.setDiagnosisId(first.getDiagnosisId());
+            response.setDiagnosisName(first.getDiagnosisName());
+            response.setDiagnosisCode(first.getDiagnosisCode());
+            response.setDiagnosisDuration(first.getDuration());
+
+            List<ConsultationResponse.DiagnosisResponse> list = c.getDiagnoses().stream()
+                .map(diag -> {
+                    ConsultationResponse.DiagnosisResponse r = new ConsultationResponse.DiagnosisResponse();
+                    r.setDiagnosisId(diag.getDiagnosisId());
+                    r.setDiagnosisName(diag.getDiagnosisName());
+                    r.setDiagnosisCode(diag.getDiagnosisCode());
+                    r.setDiagnosisDuration(diag.getDuration());
+                    return r;
+                }).collect(Collectors.toList());
+            response.setDiagnoses(list);
         }
 
-        if (c.getPastMedicalHistory() != null) {
-            response.setHistoryId(c.getPastMedicalHistory().getHistoryId());
-            response.setAllergies(c.getPastMedicalHistory().getAllergeies());
-            response.setCurrentMedicine(c.getPastMedicalHistory().getCurrentMedicine());
-            response.setMedicalHistory(c.getPastMedicalHistory().getMedicalHistory());
+        if (c.getPastMedicalHistories() != null && !c.getPastMedicalHistories().isEmpty()) {
+            PastMedicalHistory first = c.getPastMedicalHistories().get(0);
+            response.setHistoryId(first.getHistoryId());
+            response.setAllergies(first.getAllergeies());
+            response.setCurrentMedicine(first.getCurrentMedicine());
+            response.setMedicalHistory(first.getMedicalHistory());
+
+            List<ConsultationResponse.PastMedicalHistoryResponse> list = c.getPastMedicalHistories().stream()
+                .map(hist -> {
+                    ConsultationResponse.PastMedicalHistoryResponse r = new ConsultationResponse.PastMedicalHistoryResponse();
+                    r.setHistoryId(hist.getHistoryId());
+                    r.setAllergies(hist.getAllergeies());
+                    r.setCurrentMedicine(hist.getCurrentMedicine());
+                    r.setMedicalHistory(hist.getMedicalHistory());
+                    return r;
+                }).collect(Collectors.toList());
+            response.setPastMedicalHistories(list);
         }
 
         if (c.getVitals() != null) {
@@ -289,5 +387,11 @@ public class ConsultationServiceImpl implements ConsultationService {
         }
 
         return response;
+    }
+
+    private String formatAddress(String line1, String city, String state, String pin) {
+        return java.util.stream.Stream.of(line1, city, state, pin)
+                .filter(s -> s != null && !s.trim().isEmpty())
+                .collect(java.util.stream.Collectors.joining(", "));
     }
 }

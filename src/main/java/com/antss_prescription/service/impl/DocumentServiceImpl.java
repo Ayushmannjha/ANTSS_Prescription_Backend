@@ -12,7 +12,6 @@ import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.w3c.dom.DocumentType;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,7 +27,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final ModelMapper modelMapper;
 
     @Override
-    public DocumentDto uploadDocument(Integer patientId, MultipartFile file, DocumentType type) {
+    public DocumentDto uploadDocument(Integer patientId, MultipartFile file, String type) {
 
         try {
             Patient patient = patientRepository.findById(patientId)

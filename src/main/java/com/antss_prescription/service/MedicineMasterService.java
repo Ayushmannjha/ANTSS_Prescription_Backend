@@ -9,11 +9,11 @@ public interface MedicineMasterService {
 
     MedicineMaster saveMedicine(MedicineMaster medicine, UUID userId);
 
-    MedicineMaster getMedicineById(Long medicineId, Long userId);
+    MedicineMaster getMedicineById(Long medicineId, UUID userId);
 
     List<MedicineMaster> searchMedicine(String keyword, UUID userId);
 
-    List<MedicineMaster> getAllMedicines(Long userId);
+    List<MedicineMaster> getAllMedicines(UUID userId);
 
-    void deleteMedicine(Long medicineId, Long userId);
+    void deleteMedicine(Long medicineId, UUID userId);
 }

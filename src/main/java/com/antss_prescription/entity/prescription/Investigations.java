@@ -20,6 +20,7 @@ public class Investigations {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private int id;
 	private String inestigationName;
+	private String notes;
 	@ManyToOne
 	@JoinColumn(name = "registration_number")
 	private PatientRegistration patientRegistration;
