@@ -45,7 +45,7 @@ public class UserSubscriptionController {
     @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
     public ResponseEntity<UserSubscriptionSummaryDto> getSubscriptionSummary(
             @PathVariable UUID userId) {
-System.out.println("====request comes======");
+        System.out.println("====request comes======");
         UserSubscriptionSummaryDto summary =
                 subscriptionService.getUserSubscriptionSummary(userId);
         return ResponseEntity.ok(summary);

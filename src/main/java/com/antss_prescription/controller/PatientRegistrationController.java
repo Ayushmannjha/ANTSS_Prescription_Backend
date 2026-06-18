@@ -2,6 +2,7 @@ package com.antss_prescription.controller;
 
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -23,15 +24,12 @@ import com.antss_prescription.service.PatientRegistrationService;
 
 @RestController
 @RequestMapping("/api/patient-registrations")
-
+@RequiredArgsConstructor
 public class PatientRegistrationController {
 
-    @Autowired
-    private PatientRegistrationService patientRegistrationService;
-    @Autowired
-    private HospitalRepository hospitalRepository;
-    @Autowired
-    private ClinicRepository clinicRepository;
+    private final PatientRegistrationService patientRegistrationService;
+    private final HospitalRepository hospitalRepository;
+    private final ClinicRepository clinicRepository;
     
 
     // Create Registration

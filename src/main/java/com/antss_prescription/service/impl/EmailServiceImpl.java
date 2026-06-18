@@ -1,6 +1,7 @@
 package com.antss_prescription.service.impl;
 
 import com.antss_prescription.service.EmailService;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +14,7 @@ import jakarta.mail.internet.MimeMessage;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class EmailServiceImpl implements EmailService {
 
 
@@ -20,10 +22,6 @@ public class EmailServiceImpl implements EmailService {
 
     @Value("${spring.mail.username}")
     private String fromEmail;
-
-    public EmailServiceImpl(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
 
     @Override
     public void sendRegistrationNotificationToAdmin(String adminEmail, String userFullName,

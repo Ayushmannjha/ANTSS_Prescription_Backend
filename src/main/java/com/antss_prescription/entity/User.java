@@ -29,7 +29,7 @@ import lombok.ToString;
 @Entity
 @Table(name = "users")
 @Data
-@ToString(exclude = {"userSubscriptions", "password"})
+@ToString(exclude = "subscriptions")
 public class User {
 
     @Id

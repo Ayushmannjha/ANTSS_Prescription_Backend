@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -20,17 +21,13 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/rmos")
+@RequiredArgsConstructor
 @SecurityRequirement(name = "bearerAuth")
 @Tag(name = "RMO APIs", description = "Management of RMOs and staff members")
 public class RmoController {
 
     private final RmoService rmoService;
     private final UserRepository userRepository;
-
-    public RmoController(RmoService rmoService, UserRepository userRepository) {
-        this.rmoService = rmoService;
-        this.userRepository = userRepository;
-    }
 
     @PostMapping
     @Operation(summary = "Add a new RMO/Staff member")

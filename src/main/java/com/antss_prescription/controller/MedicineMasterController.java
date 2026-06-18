@@ -3,6 +3,7 @@ package com.antss_prescription.controller;
 import java.util.List;
 import java.util.UUID;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -19,14 +20,11 @@ import com.antss_prescription.service.MedicineMasterService;
 
 @RestController
 @RequestMapping("/api/medicines")
+@RequiredArgsConstructor
 @CrossOrigin("*")
 public class MedicineMasterController {
 
     private final MedicineMasterService medicineService;
-
-    public MedicineMasterController(MedicineMasterService medicineService) {
-        this.medicineService = medicineService;
-    }
 
     @PostMapping
     public ResponseEntity<MedicineMaster> saveMedicine(

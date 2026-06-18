@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -31,32 +32,18 @@ import com.antss_prescription.service.ConsultationService;
 import jakarta.transaction.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class ConsultationServiceImpl implements ConsultationService {
 
-    @Autowired
-    private ConsultationRepo consultationRepo;
+    private final ConsultationRepo consultationRepo;
+    private final DoctorRepository doctorRepository;
+    private final CheifComplaintsRepo cheifComplaintsRepository;
+    private final GeneralExaminationRepo generalExaminationRepository;
+    private final DaignosisRepo diagnosisRepository;
+    private final PastMedicalHistoryRepo pastMedicalHistoryRepository;
+    private final VitalsRepo vitalsRepository;
 
-    @Autowired
-    private DoctorRepository doctorRepository;
 
-    @Autowired
-    private CheifComplaintsRepo cheifComplaintsRepository;
-
-    @Autowired
-    private GeneralExaminationRepo generalExaminationRepository;
-
-    @Autowired
-    private DaignosisRepo diagnosisRepository;
-
-    @Autowired
-    private PastMedicalHistoryRepo pastMedicalHistoryRepository;
-
-    @Autowired
-    private VitalsRepo vitalsRepository;
-
-    // ─────────────────────────────────────────────
-    // CREATE
-    // ─────────────────────────────────────────────
     @Override
     @Transactional
     public ConsultationResponse saveConsultation(Consultation consultation) {
@@ -111,9 +98,6 @@ public class ConsultationServiceImpl implements ConsultationService {
         return mapToResponse(consultationRepo.save(consultation));
     }
 
-    // ─────────────────────────────────────────────
-    // READ — single
-    // ─────────────────────────────────────────────
     @Override
     public ConsultationResponse getConsultationById(Integer consultationId) {
         Consultation consultation = consultationRepo.findById(consultationId)
@@ -134,9 +118,6 @@ public class ConsultationServiceImpl implements ConsultationService {
         return responses;
     }
 
-    // ─────────────────────────────────────────────
-    // READ — by doctor
-    // ─────────────────────────────────────────────
     @Override
     public List<ConsultationResponse> getConsultationsByDoctor(UUID doctorId) {
         List<ConsultationResponse> all = consultationRepo
@@ -154,9 +135,6 @@ public class ConsultationServiceImpl implements ConsultationService {
         return new ArrayList<>(latestPerPatient.values());
     }
 
-    // ─────────────────────────────────────────────
-    // UPDATE
-    // ─────────────────────────────────────────────
     @Override
     @Transactional
     public ConsultationResponse updateConsultation(Integer consultationId,
@@ -232,9 +210,6 @@ public class ConsultationServiceImpl implements ConsultationService {
         return mapToResponse(consultationRepo.save(existing));
     }
 
-    // ─────────────────────────────────────────────
-    // DELETE
-    // ─────────────────────────────────────────────
     @Override
     public void deleteConsultation(Integer consultationId) {
         Consultation consultation = consultationRepo.findById(consultationId)
@@ -243,9 +218,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         consultationRepo.delete(consultation);
     }
 
-    // ─────────────────────────────────────────────
-    // MAPPER
-    // ─────────────────────────────────────────────
+
     private ConsultationResponse mapToResponse(Consultation c) {
 
         ConsultationResponse response = new ConsultationResponse();

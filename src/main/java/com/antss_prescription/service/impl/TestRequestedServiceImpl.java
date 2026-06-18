@@ -3,6 +3,7 @@ package com.antss_prescription.service.impl;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -13,21 +14,12 @@ import com.antss_prescription.repository.prescription.TestRequestedRepo;
 import com.antss_prescription.service.TestRequestedService;
 
 @Service
+@RequiredArgsConstructor
 public class TestRequestedServiceImpl implements TestRequestedService {
 
-    // =========================
-    // Autowired
-    // =========================
+    private final TestRequestedRepo testRequestedRepo;
+    private final PrescriptionRepo prescriptionRepo;
 
-    @Autowired
-    private TestRequestedRepo testRequestedRepo;
-
-    @Autowired
-    private PrescriptionRepo prescriptionRepo;
-
-    // =========================
-    // Save
-    // =========================
 
     @Override
     public TestRequested save(TestRequested testRequested) {
@@ -67,9 +59,6 @@ public class TestRequestedServiceImpl implements TestRequestedService {
         }
     }
 
-    // =========================
-    // Get By Registration Number
-    // =========================
 
     @Override
     public List<TestRequested> getByRegistrationNumber(
@@ -105,10 +94,6 @@ public class TestRequestedServiceImpl implements TestRequestedService {
         }
     }
 
-    // =========================
-    // Get By Document ID
-    // =========================
-
     @Override
     public List<TestRequested> getByDocumentId(
             Integer documentId) {
@@ -143,10 +128,6 @@ public class TestRequestedServiceImpl implements TestRequestedService {
         }
     }
 
-    // =========================
-    // Delete By ID
-    // =========================
-
     @Override
     public void deleteById(Integer id) {
 
@@ -171,10 +152,6 @@ public class TestRequestedServiceImpl implements TestRequestedService {
                             + ex.getMessage());
         }
     }
-
-    // =========================
-    // Get By Prescription
-    // =========================
 
     @Override
     public List<TestRequested> getByPrescription(

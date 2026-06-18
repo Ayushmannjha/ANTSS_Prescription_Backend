@@ -3,6 +3,7 @@ package com.antss_prescription.controller;
 import java.util.List;
 import java.util.UUID;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,11 +13,11 @@ import com.antss_prescription.entity.prescription.Consultation;
 import com.antss_prescription.service.ConsultationService;
 
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/consultations")
 public class ConsultationController {
 
-    @Autowired
-    private ConsultationService consultationService;
+    private final ConsultationService consultationService;
 
     @PostMapping
     public ResponseEntity<ConsultationResponse> saveConsultation(

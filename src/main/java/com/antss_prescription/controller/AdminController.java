@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/admin")
 @SecurityRequirement(name = "bearerAuth")
 @Tag(name = "Admin APIs", description = "Admin workflow for user approvals and management")
@@ -38,11 +40,6 @@ public class AdminController {
 
     @Value("${app.admin.email}")
     private String adminEmail;
-
-    public AdminController(AdminService adminService, UserRepository userRepository) {
-        this.adminService = adminService;
-        this.userRepository = userRepository;
-    }
 
     @GetMapping("/registrations/pending")
     @Operation(summary = "Get all pending registrations")

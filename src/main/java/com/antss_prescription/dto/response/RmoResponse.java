@@ -12,6 +12,7 @@ import java.util.UUID;
 @NoArgsConstructor
 public class RmoResponse {
     private UUID id;
+    private UUID userId;
     private String rmoName;
     private String email;
     private String mobileNumber;

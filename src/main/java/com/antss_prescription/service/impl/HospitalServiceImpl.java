@@ -13,6 +13,7 @@ import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.repository.*;
 import com.antss_prescription.service.EmailService;
 import com.antss_prescription.service.HospitalService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,6 +27,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 @Transactional
 public class HospitalServiceImpl implements HospitalService {
 
@@ -38,23 +40,6 @@ public class HospitalServiceImpl implements HospitalService {
     private final ModelMapper modelMapper;
     private final DoctorRepository doctorRepository;
 
-    public HospitalServiceImpl(HospitalRepository hospitalRepository,
-                               UserRepository userRepository,
-                               UserSubscriptionRepository userSubscriptionRepository,
-                               LoginCredentialRepository loginCredentialRepository,
-                               EmailService emailService,
-                               PasswordEncoder passwordEncoder,
-                               ModelMapper modelMapper,
-                               DoctorRepository doctorRepository) {
-        this.hospitalRepository = hospitalRepository;
-        this.userRepository = userRepository;
-        this.userSubscriptionRepository = userSubscriptionRepository;
-        this.loginCredentialRepository = loginCredentialRepository;
-        this.emailService = emailService;
-        this.passwordEncoder = passwordEncoder;
-        this.modelMapper = modelMapper;
-        this.doctorRepository = doctorRepository;
-    }
 
     @Override
     public HospitalResponse createHospital(CreateHospitalRequest request, UUID ownerId) {

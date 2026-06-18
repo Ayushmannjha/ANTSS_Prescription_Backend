@@ -3,6 +3,7 @@ package com.antss_prescription.service.impl;
 import java.util.List;
 import java.util.UUID;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import com.antss_prescription.entity.User;
@@ -12,18 +13,12 @@ import com.antss_prescription.repository.prescription.MedicineMasterRepository;
 import com.antss_prescription.service.MedicineMasterService;
 
 @Service
+@RequiredArgsConstructor
 public class MedicineMasterServiceImpl implements MedicineMasterService {
 
     private final MedicineMasterRepository medicineRepository;
     private final UserRepository userRepository;
 
-    public MedicineMasterServiceImpl(
-            MedicineMasterRepository medicineRepository,
-            UserRepository userRepository) {
-
-        this.medicineRepository = medicineRepository;
-        this.userRepository = userRepository;
-    }
 
     @Override
     public MedicineMaster saveMedicine(MedicineMaster medicine, UUID userId) {

@@ -21,7 +21,7 @@ import lombok.ToString;
 
 @Entity
 @Data
-@ToString(exclude = {"user", "doctors"})
+@ToString(exclude = {"user"})
 public class Clinic {
 
     @Id
