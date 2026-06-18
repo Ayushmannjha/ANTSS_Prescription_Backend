@@ -10,6 +10,7 @@ import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.repository.*;
 import com.antss_prescription.service.DoctorService;
 import com.antss_prescription.service.EmailService;
+import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 @Transactional
 public class DoctorServiceImpl implements DoctorService {
 
@@ -37,28 +39,6 @@ public class DoctorServiceImpl implements DoctorService {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final ModelMapper modelMapper;
-
-    public DoctorServiceImpl(DoctorRepository doctorRepository,
-            HospitalRepository hospitalRepository,
-            ClinicRepository clinicRepository,
-            UserRepository userRepository,
-            UserSubscriptionRepository userSubscriptionRepository,
-            SubscriptionDoctorAllocationRepository allocationRepository,
-            LoginCredentialRepository loginCredentialRepository,
-            PasswordEncoder passwordEncoder,
-            EmailService emailService,
-            ModelMapper modelMapper) {
-        this.doctorRepository = doctorRepository;
-        this.hospitalRepository = hospitalRepository;
-        this.clinicRepository = clinicRepository;
-        this.userRepository = userRepository;
-        this.userSubscriptionRepository = userSubscriptionRepository;
-        this.allocationRepository = allocationRepository;
-        this.loginCredentialRepository = loginCredentialRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.emailService = emailService;
-        this.modelMapper = modelMapper;
-    }
 
     @Override
     public DoctorResponse addDoctor(CreateDoctorRequest request, UUID userId) {

@@ -13,6 +13,7 @@ import java.util.UUID;
 @Repository
 public interface RmoRepository extends JpaRepository<Rmo, UUID> {
     Optional<Rmo> findByEmployeeCode(String employeeCode);
+    Optional<Rmo> findByUserId(UUID userId);
     List<Rmo> findByHospital(Hospital hospital);
     List<Rmo> findByClinic(Clinic clinic);
     List<Rmo> findByHospitalId(Long hospitalId);

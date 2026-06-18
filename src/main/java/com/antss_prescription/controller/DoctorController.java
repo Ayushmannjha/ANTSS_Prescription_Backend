@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -21,17 +22,13 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/doctors")
+@RequiredArgsConstructor
 @SecurityRequirement(name = "bearerAuth")
 @Tag(name = "Doctor APIs", description = "Management of doctors for Hospitals and Clinics")
 public class DoctorController {
 
     private final DoctorService doctorService;
     private final UserRepository userRepository;
-
-    public DoctorController(DoctorService doctorService, UserRepository userRepository) {
-        this.doctorService = doctorService;
-        this.userRepository = userRepository;
-    }
 
     @PostMapping
     @Operation(summary = "Add a new doctor")

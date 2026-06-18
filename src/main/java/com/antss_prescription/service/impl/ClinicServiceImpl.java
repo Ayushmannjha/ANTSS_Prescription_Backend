@@ -13,6 +13,7 @@ import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.repository.*;
 import com.antss_prescription.service.ClinicService;
 import com.antss_prescription.service.EmailService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,6 +27,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 @Transactional
 public class ClinicServiceImpl implements ClinicService {
 
@@ -38,23 +40,6 @@ public class ClinicServiceImpl implements ClinicService {
     private final ModelMapper modelMapper;
     private final DoctorRepository doctorRepository;
 
-    public ClinicServiceImpl(ClinicRepository clinicRepository,
-                             UserRepository userRepository,
-                             UserSubscriptionRepository userSubscriptionRepository,
-                             LoginCredentialRepository loginCredentialRepository,
-                             EmailService emailService,
-                             PasswordEncoder passwordEncoder,
-                             ModelMapper modelMapper,
-                             DoctorRepository doctorRepository) {
-        this.clinicRepository = clinicRepository;
-        this.userRepository = userRepository;
-        this.userSubscriptionRepository = userSubscriptionRepository;
-        this.loginCredentialRepository = loginCredentialRepository;
-        this.emailService = emailService;
-        this.passwordEncoder = passwordEncoder;
-        this.modelMapper = modelMapper;
-        this.doctorRepository = doctorRepository;
-    }
 
     @Override
     public ClinicResponse createClinic(CreateClinicRequest request, UUID ownerId) {

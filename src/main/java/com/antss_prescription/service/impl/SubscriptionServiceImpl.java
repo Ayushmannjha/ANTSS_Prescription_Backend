@@ -14,6 +14,7 @@ import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.repository.DoctorAddonRepository;
 import com.antss_prescription.repository.UserSubscriptionRepository;
 import com.antss_prescription.service.SubscriptionService;
+import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,20 +30,13 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 @Transactional
 public class SubscriptionServiceImpl implements SubscriptionService {
 
     private final UserSubscriptionRepository userSubscriptionRepository;
     private final DoctorAddonRepository doctorAddonRepository;
     private final ModelMapper modelMapper;
-
-    public SubscriptionServiceImpl(UserSubscriptionRepository userSubscriptionRepository,
-                                   DoctorAddonRepository doctorAddonRepository,
-                                   ModelMapper modelMapper) {
-        this.userSubscriptionRepository = userSubscriptionRepository;
-        this.doctorAddonRepository = doctorAddonRepository;
-        this.modelMapper = modelMapper;
-    }
 
     @Override
     public DoctorAddonResponse requestAddonDoctors(AddDoctorAddonRequest request, UUID userId) {

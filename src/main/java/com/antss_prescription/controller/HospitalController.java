@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/hospitals")
 @SecurityRequirement(name = "bearerAuth")
 @Tag(name = "Hospital APIs", description = "Management of Hospital accounts")
@@ -27,11 +29,6 @@ public class HospitalController {
 
     private final HospitalService hospitalService;
     private final UserRepository userRepository;
-
-    public HospitalController(HospitalService hospitalService, UserRepository userRepository) {
-        this.hospitalService = hospitalService;
-        this.userRepository = userRepository;
-    }
 
     @PostMapping
     @Operation(summary = "Create a new hospital (owner only, subject to subscription limit)")

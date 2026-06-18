@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -21,17 +22,13 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/subscriptions")
+@RequiredArgsConstructor
 @SecurityRequirement(name = "bearerAuth")
 @Tag(name = "Subscription APIs", description = "User subscription billing and doctor addon management")
 public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;
     private final UserRepository userRepository;
-
-    public SubscriptionController(SubscriptionService subscriptionService, UserRepository userRepository) {
-        this.subscriptionService = subscriptionService;
-        this.userRepository = userRepository;
-    }
 
     @PostMapping("/addons")
     @Operation(summary = "Request additional doctor licenses (addon)")

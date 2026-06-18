@@ -7,6 +7,7 @@ import com.antss_prescription.exception.BusinessException;
 import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.repository.PackageRepository;
 import com.antss_prescription.service.PackageService;
+import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,15 +19,11 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class PackageServiceImpl implements PackageService {
 
     private final PackageRepository packageRepository;
     private final ModelMapper modelMapper;
-
-    public PackageServiceImpl(PackageRepository packageRepository, ModelMapper modelMapper) {
-        this.packageRepository = packageRepository;
-        this.modelMapper = modelMapper;
-    }
 
     @Override
     public PackageResponse createPackage(CreatePackageRequest request) {

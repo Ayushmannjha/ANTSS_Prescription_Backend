@@ -23,6 +23,7 @@ public class UserResponse {
     private LocalDateTime registrationDate;
     private LocalDateTime createdAt;
     private UUID doctorId;
+    private UUID rmoId;
     private Long hospitalId;
     private Long clinicId;
 }

@@ -3,6 +3,7 @@ package com.antss_prescription.service.impl;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -11,10 +12,10 @@ import com.antss_prescription.repository.prescription.PatientRepo;
 import com.antss_prescription.service.PatientService;
 
 @Service
+@RequiredArgsConstructor
 public class PatientServiceImpl implements PatientService {
 
-    @Autowired
-    private PatientRepo patientRepo;
+    private final PatientRepo patientRepo;
 
     @Override
     public Patient savePatient(Patient patient) {

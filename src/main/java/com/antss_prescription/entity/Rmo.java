@@ -33,6 +33,10 @@ public class Rmo {
     @JoinColumn(name = "clinic_id")
     private Clinic clinic;
 
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RmoRole role = RmoRole.RMO;

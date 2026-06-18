@@ -3,6 +3,7 @@ package com.antss_prescription.service.impl;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.stereotype.Service;
@@ -14,26 +15,13 @@ import com.antss_prescription.repository.prescription.PrescriptionRepo;
 import com.antss_prescription.service.InvestigationsService;
 
 @Service
+@RequiredArgsConstructor
 public class InvestigationsServiceImpl implements InvestigationsService {
 
     private final AuthenticationProvider authenticationProvider;
 
-    // =========================
-    // Autowired
-    // =========================
-
-    @Autowired
     private InvestigationsRepo investigationsRepo;
-    @Autowired
     private PrescriptionRepo prescriptionRepo;
-
-    InvestigationsServiceImpl(AuthenticationProvider authenticationProvider) {
-        this.authenticationProvider = authenticationProvider;
-    }
-
-    // =========================
-    // Save
-    // =========================
 
     @Override
     public Investigations save(Investigations investigations) {

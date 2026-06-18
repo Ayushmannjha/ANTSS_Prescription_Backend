@@ -50,6 +50,4 @@ public class MedicineMaster {
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
     }
-
-	
 }

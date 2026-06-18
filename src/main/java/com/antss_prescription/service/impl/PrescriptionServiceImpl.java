@@ -51,10 +51,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class PrescriptionServiceImpl implements PrescriptionService {
 
-    // =========================
-    // Repositories
-    // =========================
-
     private final PatientRegistrationRepo registrationRepository;
     private final VitalsRepo vitalsRepository;
     private final CheifComplaintsRepo cheifComplaintsRepository;
@@ -70,9 +66,6 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     private final TestRequestedRepo testRequestedRepo;
     private final DocumentRepo documentRepo;
 
-    // ─────────────────────────────────────────────
-    // CREATE
-    // ─────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -96,9 +89,6 @@ public class PrescriptionServiceImpl implements PrescriptionService {
             System.out.println(
                     "==== CONSULTATION IS NOT PRESENT ====");
 
-            // =========================
-            // Patient Registration
-            // =========================
 
             PatientRegistration registration = registrationRepository
                     .findById(req.getRegistrationId())

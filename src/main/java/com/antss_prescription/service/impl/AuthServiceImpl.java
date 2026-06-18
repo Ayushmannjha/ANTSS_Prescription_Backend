@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import com.antss_prescription.entity.Doctor;
 import com.antss_prescription.entity.Hospital;
 import com.antss_prescription.entity.LoginCredential;
 import com.antss_prescription.entity.LoginSession;
+import com.antss_prescription.entity.Rmo;
 import com.antss_prescription.entity.SubscriptionPackage;
 import com.antss_prescription.entity.User;
 import com.antss_prescription.entity.UserSubscription;
@@ -41,6 +43,7 @@ import com.antss_prescription.repository.HospitalRepository;
 import com.antss_prescription.repository.LoginCredentialRepository;
 import com.antss_prescription.repository.LoginSessionRepository;
 import com.antss_prescription.repository.PackageRepository;
+import com.antss_prescription.repository.RmoRepository;
 import com.antss_prescription.repository.UserRepository;
 import com.antss_prescription.repository.UserSubscriptionRepository;
 import com.antss_prescription.security.ApprovalTokenUtils;
@@ -53,6 +56,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
@@ -66,6 +70,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailService emailService;
     private final DoctorRepository doctorRepository;
+    private final RmoRepository rmoRepository;
 
     @Value("${app.admin.email}")
     private String adminEmail;
@@ -76,29 +81,6 @@ public class AuthServiceImpl implements AuthService {
     @Value("${app.base-url:http://localhost:2030}")
     private String baseUrl;
 
-    public AuthServiceImpl(UserRepository userRepository,
-                           PackageRepository packageRepository,
-                           LoginSessionRepository loginSessionRepository,
-                           HospitalRepository hospitalRepository,
-                           ClinicRepository clinicRepository,
-                           UserSubscriptionRepository userSubscriptionRepository,
-                           LoginCredentialRepository loginCredentialRepository,
-                           PasswordEncoder passwordEncoder,
-                           JwtTokenProvider jwtTokenProvider,
-                           EmailService emailService,
-                           DoctorRepository doctorRepository) {
-        this.userRepository = userRepository;
-        this.packageRepository = packageRepository;
-        this.loginSessionRepository = loginSessionRepository;
-        this.hospitalRepository = hospitalRepository;
-        this.clinicRepository = clinicRepository;
-        this.userSubscriptionRepository = userSubscriptionRepository;
-        this.loginCredentialRepository = loginCredentialRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtTokenProvider = jwtTokenProvider;
-        this.emailService = emailService;
-        this.doctorRepository = doctorRepository;
-    }
 
   @Override
 public void register(RegisterRequest request) {
@@ -114,6 +96,10 @@ public void register(RegisterRequest request) {
 
         if (!pkg.isActive()) {
             throw new BusinessException("Selected package is not active");
+        }
+
+        if (request.getUserType() != UserType.HOSPITAL && request.getUserType() != UserType.CLINIC) {
+            throw new BusinessException("Only HOSPITAL and CLINIC users can register directly");
         }
 
         User user = new User();
@@ -305,6 +291,27 @@ public void register(RegisterRequest request) {
             } else {
                 throw new RuntimeException("Doctor is not associated with any Hospital or Clinic");
             }
+        } else if (user.getUserType().equals(UserType.RMO)) {
+            Rmo rmo = rmoRepository.findByUserId(user.getId())
+                    .orElseThrow(() -> new UnauthorizedException("RMO profile not found for user: " + user.getEmail()));
+            Hospital hospital = rmo.getHospital();
+            Clinic clinic = rmo.getClinic();
+
+            if (hospital != null) {
+                UUID hospitalOwnerId = hospital.getOwner() != null
+                        ? hospital.getOwner().getId()
+                        : hospital.getUser().getId();
+                activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(
+                        hospitalOwnerId, SubscriptionStatus.ACTIVE);
+            } else if (clinic != null) {
+                UUID clinicOwnerId = clinic.getOwner() != null
+                        ? clinic.getOwner().getId()
+                        : clinic.getUser().getId();
+                activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(
+                        clinicOwnerId, SubscriptionStatus.ACTIVE);
+            } else {
+                throw new RuntimeException("RMO is not associated with any Hospital or Clinic");
+            }
         }
         
         boolean hasValidSub = false;
@@ -446,6 +453,16 @@ public void register(RegisterRequest request) {
                 }
                 if (doctor.getClinic() != null) {
                     response.setClinicId(doctor.getClinic().getId());
+                }
+            });
+        } else if (user.getUserType() == UserType.RMO) {
+            rmoRepository.findByUserId(user.getId()).ifPresent(rmo -> {
+                response.setRmoId(rmo.getId());
+                if (rmo.getHospital() != null) {
+                    response.setHospitalId(rmo.getHospital().getId());
+                }
+                if (rmo.getClinic() != null) {
+                    response.setClinicId(rmo.getClinic().getId());
                 }
             });
         } else if (user.getUserType() == UserType.HOSPITAL) {

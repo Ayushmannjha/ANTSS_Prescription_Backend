@@ -3,6 +3,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -19,14 +20,12 @@ import com.antss_prescription.service.PatientRegistrationService;
 import jakarta.transaction.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class PatientRegistrationServiceImpl
         implements PatientRegistrationService {
 
-    @Autowired
-    private PatientRegistrationRepo registrationRepo;
-
-    @Autowired
-    private PatientRepo patientRepository;
+    private final PatientRegistrationRepo registrationRepo;
+    private final PatientRepo patientRepository;
 
     @Override
     @Transactional

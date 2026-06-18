@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -46,6 +47,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 @Transactional
 public class AdminServiceImpl implements AdminService {
 
@@ -60,30 +62,7 @@ public class AdminServiceImpl implements AdminService {
     private final ModelMapper modelMapper;
     private final PasswordEncoder passwordEncoder;
     private final LoginCredentialRepository loginCredentialRepository;
-    
-    public AdminServiceImpl(UserRepository userRepository,
-                            PackageRepository packageRepository,
-                            LoginSessionRepository loginSessionRepository,
-                            UserSubscriptionRepository userSubscriptionRepository,
-                            HospitalRepository hospitalRepository,
-                            ClinicRepository clinicRepository,
-                            DoctorAddonRepository doctorAddonRepository,
-                            EmailService emailService,
-                            ModelMapper modelMapper,
-                            PasswordEncoder passwordEncoder,
-                            LoginCredentialRepository loginCredentialRepository) {
-        this.userRepository = userRepository;
-        this.packageRepository = packageRepository;
-        this.loginSessionRepository = loginSessionRepository;
-        this.userSubscriptionRepository = userSubscriptionRepository;
-        this.hospitalRepository = hospitalRepository;
-        this.clinicRepository = clinicRepository;
-        this.doctorAddonRepository = doctorAddonRepository;
-        this.emailService = emailService;
-        this.modelMapper = modelMapper;
-        this.passwordEncoder = passwordEncoder;
-        this.loginCredentialRepository = loginCredentialRepository;
-    }
+
 
     @Override
     public List<UserResponse> getPendingRegistrations() {

@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,17 +22,13 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/clinics")
+@RequiredArgsConstructor
 @SecurityRequirement(name = "bearerAuth")
 @Tag(name = "Clinic APIs", description = "Management of Clinic accounts")
 public class ClinicController {
 
     private final ClinicService clinicService;
     private final UserRepository userRepository;
-
-    public ClinicController(ClinicService clinicService, UserRepository userRepository) {
-        this.clinicService = clinicService;
-        this.userRepository = userRepository;
-    }
 
     @PostMapping
     @Operation(summary = "Create a new clinic (owner only, subject to subscription limit)")

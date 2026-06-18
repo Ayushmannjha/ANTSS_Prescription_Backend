@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -17,14 +18,12 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/packages")
+@RequiredArgsConstructor
 @Tag(name = "Package APIs", description = "Manage subscription packages")
 public class PackageController {
 
     private final PackageService packageService;
 
-    public PackageController(PackageService packageService) {
-        this.packageService = packageService;
-    }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
