@@ -38,6 +38,8 @@ public class DetailedPrescriptionResponse {
         private String investigationName;
         private String notes;
         private LocalDateTime createdAt;
+        private String documentUrl;
+        private String documentFileName;
     }
 
     @Data

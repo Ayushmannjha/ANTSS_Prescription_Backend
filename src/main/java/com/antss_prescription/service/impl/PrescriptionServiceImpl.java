@@ -268,6 +268,25 @@ public class PrescriptionServiceImpl implements PrescriptionService {
         }
 
         // =========================
+        // Save Documents
+        // =========================
+
+        if (req.getDocuments() != null) {
+
+            Patient patient = consultation.getPatient();
+
+            for (SavePrescriptionRequest.DocumentRequest d
+                    : req.getDocuments()) {
+
+                Document document = new Document();
+                document.setFileName(d.getFileName());
+                document.setUrl(d.getUrl());
+                document.setPatient(patient);
+                documentRepo.save(document);
+            }
+        }
+
+        // =========================
         // Save Investigations
         // =========================
 
@@ -284,6 +303,12 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                         consultation.getPatientRegistration());
                 investigation.setCreateAt(LocalDateTime.now());
                 investigation.setUpdatedAt(LocalDateTime.now());
+                
+                if (i.getDocumentUrl() != null && !i.getDocumentUrl().isEmpty()) {
+                    documentRepo.findByUrl(i.getDocumentUrl())
+                            .ifPresent(investigation::setDocument);
+                }
+                
                 investigationsRepo.save(investigation);
             }
         }
@@ -309,24 +334,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
             }
         }
 
-        // =========================
-        // Save Documents
-        // =========================
 
-        if (req.getDocuments() != null) {
-
-            Patient patient = consultation.getPatient();
-
-            for (SavePrescriptionRequest.DocumentRequest d
-                    : req.getDocuments()) {
-
-                Document document = new Document();
-                document.setFileName(d.getFileName());
-                document.setUrl(d.getUrl());
-                document.setPatient(patient);
-                documentRepo.save(document);
-            }
-        }
 
         // =========================
         // Build Response
@@ -572,6 +580,27 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
     }
 
     // =========================
+    // Replace Documents
+    // =========================
+
+    if (req.getDocuments() != null) {
+
+        Patient patient = consultation.getPatient();
+
+        documentRepo.deleteByPatientPatientId(patient.getPatientId());
+
+        for (SavePrescriptionRequest.DocumentRequest d
+                : req.getDocuments()) {
+
+            Document document = new Document();
+            document.setFileName(d.getFileName());
+            document.setUrl(d.getUrl());
+            document.setPatient(patient);
+            documentRepo.save(document);
+        }
+    }
+
+    // =========================
     // Replace Investigations
     // =========================
 
@@ -584,11 +613,18 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
 
             Investigations investigation = new Investigations();
             investigation.setInestigationName(i.getInvestigationName());
+            investigation.setNotes(i.getNotes());
             investigation.setPrescription(prescription);
             investigation.setPatientRegistration(
                     consultation.getPatientRegistration());
             investigation.setCreateAt(LocalDateTime.now());
             investigation.setUpdatedAt(LocalDateTime.now());
+
+            if (i.getDocumentUrl() != null && !i.getDocumentUrl().isEmpty()) {
+                documentRepo.findByUrl(i.getDocumentUrl())
+                        .ifPresent(investigation::setDocument);
+            }
+
             investigationsRepo.save(investigation);
         }
     }
@@ -615,26 +651,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
         }
     }
 
-    // =========================
-    // Replace Documents
-    // =========================
 
-    if (req.getDocuments() != null) {
-
-        Patient patient = consultation.getPatient();
-
-        documentRepo.deleteByPatientPatientId(patient.getPatientId());
-
-        for (SavePrescriptionRequest.DocumentRequest d
-                : req.getDocuments()) {
-
-            Document document = new Document();
-            document.setFileName(d.getFileName());
-            document.setUrl(d.getUrl());
-            document.setPatient(patient);
-            documentRepo.save(document);
-        }
-    }
 
     // =========================
     // Build Response
@@ -968,6 +985,8 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                                 .investigationName(i.getInestigationName())
                                 .notes(i.getNotes())
                                 .createdAt(i.getCreateAt())
+                                .documentUrl(i.getDocument() != null ? i.getDocument().getUrl() : null)
+                                .documentFileName(i.getDocument() != null ? i.getDocument().getFileName() : null)
                                 .build())
                         .collect(Collectors.toList());
 

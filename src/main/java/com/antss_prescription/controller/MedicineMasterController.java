@@ -21,7 +21,6 @@ import com.antss_prescription.service.MedicineMasterService;
 @RestController
 @RequestMapping("/api/medicines")
 @RequiredArgsConstructor
-@CrossOrigin("*")
 public class MedicineMasterController {
 
     private final MedicineMasterService medicineService;

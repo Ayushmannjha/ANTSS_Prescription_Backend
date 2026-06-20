@@ -103,6 +103,8 @@ public class SavePrescriptionRequest {
     public static class InvestigationRequest {
         private String investigationName;
         private String notes;
+        private String documentUrl;
+        private String documentFileName;
     }
 
     // =========================

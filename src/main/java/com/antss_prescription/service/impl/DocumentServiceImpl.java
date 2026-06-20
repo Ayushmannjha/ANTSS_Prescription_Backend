@@ -46,7 +46,8 @@ public class DocumentServiceImpl implements DocumentService {
             return modelMapper.map(savedDocument, DocumentDto.class);
 
         } catch (IOException e) {
-            throw new RuntimeException("Failed to upload document", e);
+            e.printStackTrace();
+            throw new RuntimeException("Failed to upload document: " + e.getMessage(), e);
         }
     }
 

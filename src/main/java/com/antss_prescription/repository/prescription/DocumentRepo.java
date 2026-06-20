@@ -29,4 +29,6 @@ public interface DocumentRepo extends JpaRepository<Document, Long> {
 	void deleteByPatientPatientId(int patientId);
 
 	List<Document> findByPatientPatientId(int patientId);
+
+    Optional<Document> findByUrl(String url);
 }
