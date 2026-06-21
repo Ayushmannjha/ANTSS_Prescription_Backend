@@ -3,8 +3,8 @@ package com.antss_prescription.controller;
 import java.util.List;
 import java.util.UUID;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,7 +21,7 @@ public class ConsultationController {
 
     @PostMapping
     public ResponseEntity<ConsultationResponse> saveConsultation(
-            @RequestBody Consultation consultation) {
+            @Valid @RequestBody Consultation consultation) {
         return ResponseEntity.ok(consultationService.saveConsultation(consultation));
     }
 
@@ -45,7 +45,7 @@ public class ConsultationController {
     @PutMapping("/{consultationId}")
     public ResponseEntity<ConsultationResponse> updateConsultation(
             @PathVariable Integer consultationId,
-            @RequestBody Consultation consultation) {
+            @Valid @RequestBody Consultation consultation) {
         return ResponseEntity.ok(consultationService.updateConsultation(consultationId, consultation));
     }
 

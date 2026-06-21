@@ -12,6 +12,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -25,9 +28,12 @@ public class PatientRegistration {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private int registrationId;
+	@Size(max = 100)
 	private String registrationNumber;//this is used as UHID
 	@ManyToOne
 	@JoinColumn(name = "patient_id")
+	@NotNull
+	@Valid
 	private Patient patient;
 	@ManyToOne
 	@JoinColumn(name="clinic_id", nullable = true)
@@ -35,6 +41,7 @@ public class PatientRegistration {
 	@ManyToOne
 	@JoinColumn(name="hospital_id", nullable = true)
 	private Hospital hospital;
+	@Size(max = 50)
 	private String status;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;

@@ -12,6 +12,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Getter;
 import lombok.Setter;
@@ -29,14 +31,20 @@ public class MedicineMaster {
     private Long medicineId;
 
     
+    @NotBlank
+    @Size(max = 255)
     private String medicineName;
 
+    @Size(max = 255)
     private String genericName;
 
+    @Size(max = 100)
     private String strength;
 
+    @Size(max = 100)
     private String dosageForm; // Tablet, Capsule, Syrup, Injection
 
+    @Size(max = 255)
     private String manufacturer;
 
     private Boolean active = true;

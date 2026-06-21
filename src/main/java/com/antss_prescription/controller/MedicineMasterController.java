@@ -3,6 +3,7 @@ package com.antss_prescription.controller;
 import java.util.List;
 import java.util.UUID;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -27,7 +28,7 @@ public class MedicineMasterController {
 
     @PostMapping
     public ResponseEntity<MedicineMaster> saveMedicine(
-            @RequestBody MedicineMaster medicine,
+            @Valid @RequestBody MedicineMaster medicine,
             @RequestParam UUID userId) {
 
         return ResponseEntity.ok(

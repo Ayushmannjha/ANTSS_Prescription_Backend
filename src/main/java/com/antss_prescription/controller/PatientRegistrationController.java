@@ -2,8 +2,8 @@ package com.antss_prescription.controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,7 +35,7 @@ public class PatientRegistrationController {
     // Create Registration
     @PostMapping
     public ResponseEntity<PatientRegistration> saveRegistration(
-            @RequestBody PatientRegistration registration) {
+            @Valid @RequestBody PatientRegistration registration) {
 
         PatientRegistration savedRegistration =
                 patientRegistrationService.saveRegistration(registration);
@@ -80,7 +80,7 @@ public class PatientRegistrationController {
     @PutMapping("/{registrationId}")
     public ResponseEntity<PatientRegistrationResponse> updateRegistration(
             @PathVariable Integer registrationId,
-            @RequestBody PatientRegistration registration) {
+            @Valid @RequestBody PatientRegistration registration) {
     	
     	PatientRegistrationResponse updatedRegistration =
                 patientRegistrationService.updateRegistration(

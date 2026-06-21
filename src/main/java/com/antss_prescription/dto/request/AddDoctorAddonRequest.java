@@ -11,9 +11,10 @@ public class AddDoctorAddonRequest {
     private UUID userSubscriptionId;
 
     @NotNull
-    @Min(1)
+    @Positive
     private Integer additionalDoctors;
     
     
+    @Positive
     private Long entityId;
 }
