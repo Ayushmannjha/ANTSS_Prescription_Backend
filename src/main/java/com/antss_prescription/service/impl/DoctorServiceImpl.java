@@ -36,6 +36,7 @@ public class DoctorServiceImpl implements DoctorService {
     private final UserSubscriptionRepository userSubscriptionRepository;
     private final SubscriptionDoctorAllocationRepository allocationRepository;
     private final LoginCredentialRepository loginCredentialRepository;
+    private final LoginSessionRepository loginSessionRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final ModelMapper modelMapper;
@@ -216,6 +217,7 @@ public class DoctorServiceImpl implements DoctorService {
         if (oldStatus == EntityStatus.ACTIVE && newStatus == EntityStatus.INACTIVE) {
             deallocateDoctor(doctor);
             decrementActiveDoctorCount(doctor);
+            setLinkedLoginState(doctor, false);
         } else if (oldStatus == EntityStatus.INACTIVE && newStatus == EntityStatus.ACTIVE) {
             User owner = (doctor.getHospital() != null) ? doctor.getHospital().getOwner()
                     : doctor.getClinic().getOwner();
@@ -235,6 +237,7 @@ public class DoctorServiceImpl implements DoctorService {
 
             incrementActiveDoctorCount(doctor);
             allocateDoctorToSubscription(doctor, activeSubs);
+            setLinkedLoginState(doctor, true);
         }
 
         log.info("Doctor updated: {}", saved.getDoctorName());
@@ -250,6 +253,7 @@ public class DoctorServiceImpl implements DoctorService {
         }
         doctor.setStatus(EntityStatus.INACTIVE);
         doctorRepository.save(doctor);
+        setLinkedLoginState(doctor, false);
         log.info("Doctor deleted (marked inactive): {}", doctor.getDoctorName());
     }
 
@@ -376,6 +380,18 @@ public class DoctorServiceImpl implements DoctorService {
             c.setActiveDoctorCount(c.getActiveDoctorCount() + 1);
             clinicRepository.save(c);
         }
+    }
+
+    private void setLinkedLoginState(Doctor doctor, boolean active) {
+        if (doctor.getUser() == null) return;
+        User linkedUser = doctor.getUser();
+        linkedUser.setStatus(active ? RegistrationStatus.APPROVED : RegistrationStatus.INACTIVE);
+        userRepository.save(linkedUser);
+        loginCredentialRepository.findByUserId(linkedUser.getId()).ifPresent(credential -> {
+            credential.setLoginStatus(active ? LoginStatus.ACTIVE : LoginStatus.BLOCKED);
+            loginCredentialRepository.save(credential);
+        });
+        if (!active) loginSessionRepository.expireAllSessionsForUser(linkedUser);
     }
 
     private DoctorResponse mapToResponse(Doctor doctor) {

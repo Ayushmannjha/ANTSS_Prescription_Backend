@@ -131,7 +131,8 @@ public class ClinicServiceImpl implements ClinicService {
         Clinic clinic = clinicRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Clinic", id));
         
-        boolean hasAccess = clinic.getUser().getId().equals(userId);
+        boolean hasAccess = clinic.getUser().getId().equals(userId)
+                || (clinic.getOwner() != null && clinic.getOwner().getId().equals(userId));
         if (!hasAccess) {
             // Check if user is a doctor of this clinic
             hasAccess = doctorRepository.findByUserId(userId)

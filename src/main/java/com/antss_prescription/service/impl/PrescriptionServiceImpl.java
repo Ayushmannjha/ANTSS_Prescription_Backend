@@ -26,10 +26,7 @@ import com.antss_prescription.entity.prescription.Prescription;
 import com.antss_prescription.entity.prescription.PrescriptionMedicines;
 import com.antss_prescription.entity.prescription.TestRequested;
 import com.antss_prescription.entity.prescription.Vitals;
-import com.antss_prescription.enums.UserType;
-import com.antss_prescription.exception.BusinessException;
-import com.antss_prescription.repository.DoctorRepository;
-import com.antss_prescription.repository.UserRepository;
+import com.antss_prescription.entity.Doctor;
 import com.antss_prescription.repository.prescription.CheifComplaintsRepo;
 import com.antss_prescription.repository.prescription.ConsultationRepo;
 import com.antss_prescription.repository.prescription.DaignosisRepo;
@@ -43,6 +40,8 @@ import com.antss_prescription.repository.prescription.PrescriptionRepo;
 import com.antss_prescription.repository.prescription.TestRequestedRepo;
 import com.antss_prescription.repository.prescription.VitalsRepo;
 import com.antss_prescription.service.PrescriptionService;
+import com.antss_prescription.security.AccessControlService;
+import com.antss_prescription.exception.ForbiddenException;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -60,11 +59,10 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     private final ConsultationRepo consultationRepository;
     private final PrescriptionRepo prescriptionRepository;
     private final PrescriptionMedicinesRepo prescriptionMedicinesRepository;
-    private final DoctorRepository doctorRepository;
-    private final UserRepository userRepository;
     private final InvestigationsRepo investigationsRepo;
     private final TestRequestedRepo testRequestedRepo;
     private final DocumentRepo documentRepo;
+    private final AccessControlService accessControl;
 
 
     @Override
@@ -84,6 +82,14 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                             "Consultation not found: "
                                     + req.getConsultationId()));
 
+            accessControl.requireConsultationAccess(consultation);
+            Doctor currentDoctor = accessControl.requireCurrentDoctorFor(
+                    consultation.getPatientRegistration());
+            if (consultation.getDoctor() == null
+                    || !consultation.getDoctor().getId().equals(currentDoctor.getId())) {
+                throw new ForbiddenException("A consultation can only be reused by its assigned doctor");
+            }
+
         } else {
 
             System.out.println(
@@ -95,6 +101,8 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                     .orElseThrow(() -> new RuntimeException(
                             "PatientRegistration not found: "
                                     + req.getRegistrationId()));
+
+            Doctor currentDoctor = accessControl.requireCurrentDoctorFor(registration);
 
             // =========================
             // Vitals
@@ -125,6 +133,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
             consultation.setPatientRegistration(registration);
             consultation.setPatient(registration.getPatient());
             consultation.setVitals(vitals);
+            consultation.setDoctor(currentDoctor);
             consultation.setAdvice(req.getAdvice());
             consultation.setFollowUpDate(req.getFollowUpDate());
             consultation.setCreatedAt(LocalDateTime.now());
@@ -200,34 +209,6 @@ public class PrescriptionServiceImpl implements PrescriptionService {
             // =========================
             // Set Doctor
             // =========================
-
-            try {
-
-                org.springframework.security.core.Authentication auth =
-                        org.springframework.security.core.context.SecurityContextHolder
-                                .getContext()
-                                .getAuthentication();
-
-                if (auth != null && auth.getName() != null) {
-
-                    String email = auth.getName();
-                    Consultation finalConsultation = consultation;
-
-                    userRepository.findByEmail(email).ifPresent(user -> {
-
-                        if (user.getUserType() == UserType.DOCTOR) {
-
-                            doctorRepository
-                                    .findByUserId(user.getId())
-                                    .ifPresent(finalConsultation::setDoctor);
-                        }
-                    });
-                }
-
-            } catch (Exception e) {
-
-                throw new BusinessException("Prescription not created");
-            }
 
             consultation = consultationRepository.save(consultation);
         }
@@ -362,6 +343,8 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                 .orElseThrow(() -> new RuntimeException(
                         "Prescription not found: " + prescriptionId));
 
+        accessControl.requirePrescriptionAccess(prescription);
+
         Consultation consultation = prescription.getConsultation();
         PatientRegistration registration = consultation.getPatientRegistration();
         List<PrescriptionMedicines> medicines =
@@ -377,8 +360,10 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     @Override
     public List<PrescriptionResponse> getAllPrescriptions() {
 
+        var user = accessControl.currentUser();
         return prescriptionRepository.findAll()
                 .stream()
+                .filter(prescription -> accessControl.canAccess(prescription, user))
                 .map(prescription -> {
                     Consultation consultation = prescription.getConsultation();
                     PatientRegistration registration =
@@ -397,9 +382,11 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     @Override
     public List<PrescriptionResponse> getPrescriptionsByPatientId(int patientId) {
 
+        var user = accessControl.currentUser();
         return prescriptionRepository
                 .findByConsultation_Patient_PatientId(patientId)
                 .stream()
+                .filter(prescription -> accessControl.canAccess(prescription, user))
                 .map(prescription -> {
                     Consultation consultation = prescription.getConsultation();
                     PatientRegistration registration =
@@ -417,6 +404,10 @@ public class PrescriptionServiceImpl implements PrescriptionService {
 
     @Override
     public List<PrescriptionResponse> getPrescriptionsByRegistrationId(int registrationId) {
+
+        PatientRegistration requestedRegistration = registrationRepository.findById(registrationId)
+                .orElseThrow(() -> new RuntimeException("Patient registration not found: " + registrationId));
+        accessControl.requireRegistrationAccess(requestedRegistration);
 
         return prescriptionRepository
                 .findByConsultation_PatientRegistration_RegistrationId(registrationId)
@@ -445,6 +436,8 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
             .findById(prescriptionId)
             .orElseThrow(() -> new RuntimeException(
                     "Prescription not found: " + prescriptionId));
+
+    accessControl.requirePrescriptionAccess(prescription);
 
     Consultation consultation = prescription.getConsultation();
 
@@ -674,6 +667,8 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                 .orElseThrow(() -> new RuntimeException(
                         "Prescription not found: " + prescriptionId));
 
+        accessControl.requirePrescriptionAccess(prescription);
+
         // =========================
         // Delete Children First
         // =========================
@@ -724,6 +719,8 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                 .orElseThrow(() -> new RuntimeException(
                         "Prescription not found: " + prescriptionId));
 
+        accessControl.requirePrescriptionAccess(prescription);
+
         return buildDetailedResponse(prescription);
     }
 
@@ -735,9 +732,11 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
     public List<DetailedPrescriptionResponse> getDetailedPrescriptionsByPatientId(
             int patientId) {
 
+        var user = accessControl.currentUser();
         return prescriptionRepository
                 .findByConsultation_Patient_PatientId(patientId)
                 .stream()
+                .filter(prescription -> accessControl.canAccess(prescription, user))
                 .map(this::buildDetailedResponse)
                 .collect(Collectors.toList());
     }

@@ -27,6 +27,8 @@ import com.antss_prescription.repository.prescription.DaignosisRepo;
 import com.antss_prescription.repository.prescription.GeneralExaminationRepo;
 import com.antss_prescription.repository.prescription.PastMedicalHistoryRepo;
 import com.antss_prescription.repository.prescription.VitalsRepo;
+import com.antss_prescription.repository.prescription.PatientRegistrationRepo;
+import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.service.ConsultationService;
 
 import jakarta.transaction.Transactional;
@@ -42,11 +44,15 @@ public class ConsultationServiceImpl implements ConsultationService {
     private final DaignosisRepo diagnosisRepository;
     private final PastMedicalHistoryRepo pastMedicalHistoryRepository;
     private final VitalsRepo vitalsRepository;
+    private final PatientRegistrationRepo registrationRepository;
+    private final AccessControlService accessControl;
 
 
     @Override
     @Transactional
     public ConsultationResponse saveConsultation(Consultation consultation) {
+
+        resolveAndAuthorizeRelationships(consultation);
 
         // Save Chief Complaints
         if (consultation.getCheifComplaints() != null) {
@@ -103,6 +109,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         Consultation consultation = consultationRepo.findById(consultationId)
                 .orElseThrow(() -> new RuntimeException(
                         "Consultation not found with id : " + consultationId));
+        accessControl.requireConsultationAccess(consultation);
         return mapToResponse(consultation);
     }
 
@@ -112,7 +119,9 @@ public class ConsultationServiceImpl implements ConsultationService {
     @Override
     public List<ConsultationResponse> getAllConsultations() {
         List<ConsultationResponse> responses = new ArrayList<>();
+        var user = accessControl.currentUser();
         for (Consultation c : consultationRepo.findAll()) {
+            if (!accessControl.canAccess(c, user)) continue;
             responses.add(mapToResponse(c));
         }
         return responses;
@@ -120,6 +129,9 @@ public class ConsultationServiceImpl implements ConsultationService {
 
     @Override
     public List<ConsultationResponse> getConsultationsByDoctor(UUID doctorId) {
+        Doctor doctor = doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new RuntimeException("Doctor not found: " + doctorId));
+        accessControl.requireDoctorAccess(doctor);
         List<ConsultationResponse> all = consultationRepo
                 .findByDoctorIdOrderByCreatedAtDesc(doctorId) // or your existing fetch method
                 .stream()
@@ -142,6 +154,9 @@ public class ConsultationServiceImpl implements ConsultationService {
         Consultation existing = consultationRepo.findById(consultationId)
                 .orElseThrow(() -> new RuntimeException(
                         "Consultation not found with id : " + consultationId));
+
+        accessControl.requireConsultationAccess(existing);
+        resolveAndAuthorizeRelationships(consultation);
 
         // Update Chief Complaints
         if (consultation.getCheifComplaints() != null) {
@@ -215,6 +230,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         Consultation consultation = consultationRepo.findById(consultationId)
                 .orElseThrow(() -> new RuntimeException(
                         "Consultation not found with id : " + consultationId));
+        accessControl.requireConsultationAccess(consultation);
         consultationRepo.delete(consultation);
     }
 
@@ -366,5 +382,27 @@ public class ConsultationServiceImpl implements ConsultationService {
         return java.util.stream.Stream.of(line1, city, state, pin)
                 .filter(s -> s != null && !s.trim().isEmpty())
                 .collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    private void resolveAndAuthorizeRelationships(Consultation consultation) {
+        if (consultation.getPatientRegistration() == null
+                || consultation.getPatientRegistration().getRegistrationId() <= 0) {
+            throw new IllegalArgumentException("Patient registration is required");
+        }
+        var registration = registrationRepository.findById(
+                        consultation.getPatientRegistration().getRegistrationId())
+                .orElseThrow(() -> new RuntimeException("Patient registration not found"));
+        accessControl.requireRegistrationAccess(registration);
+
+        if (consultation.getDoctor() == null || consultation.getDoctor().getId() == null) {
+            throw new IllegalArgumentException("Doctor is required");
+        }
+        Doctor doctor = doctorRepository.findById(consultation.getDoctor().getId())
+                .orElseThrow(() -> new RuntimeException("Doctor not found"));
+        accessControl.requireDoctorForRegistration(doctor, registration);
+
+        consultation.setPatientRegistration(registration);
+        consultation.setPatient(registration.getPatient());
+        consultation.setDoctor(doctor);
     }
 }

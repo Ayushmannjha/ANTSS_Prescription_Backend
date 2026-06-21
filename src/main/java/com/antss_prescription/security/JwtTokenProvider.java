@@ -54,6 +54,10 @@ public class JwtTokenProvider {
         return parseClaims(token).getSubject();
     }
 
+    public String getTokenType(String token) {
+        return parseClaims(token).get("type", String.class);
+    }
+
     public boolean validateToken(String token) {
         try {
             parseClaims(token);

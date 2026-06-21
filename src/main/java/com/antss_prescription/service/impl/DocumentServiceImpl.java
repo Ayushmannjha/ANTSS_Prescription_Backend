@@ -7,6 +7,7 @@ import com.antss_prescription.entity.prescription.Patient;
 import com.antss_prescription.repository.prescription.DocumentRepo;
 import com.antss_prescription.repository.prescription.PatientRepo;
 import com.antss_prescription.service.DocumentService;
+import com.antss_prescription.security.AccessControlService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final PatientRepo patientRepository;
     private final CloudinaryService cloudinaryService;
     private final ModelMapper modelMapper;
+    private final AccessControlService accessControl;
 
     @Override
     public DocumentDto uploadDocument(Integer patientId, MultipartFile file, String type) {
@@ -32,6 +34,7 @@ public class DocumentServiceImpl implements DocumentService {
         try {
             Patient patient = patientRepository.findById(patientId)
                     .orElseThrow(() -> new RuntimeException("Patient not found"));
+            accessControl.requirePatientAccess(patient);
 
             String fileUrl = cloudinaryService.uploadFile(file);
 
@@ -55,8 +58,9 @@ public class DocumentServiceImpl implements DocumentService {
     @Transactional(readOnly = true)
     public List<DocumentDto> getPatientDocuments(Integer patientId) {
 
-        patientRepository.findById(patientId)
+        Patient patient = patientRepository.findById(patientId)
                 .orElseThrow(() -> new RuntimeException("Patient not found"));
+        accessControl.requirePatientAccess(patient);
 
         return documentRepository.findByPatientId(patientId)
                 .stream()
@@ -74,6 +78,8 @@ public class DocumentServiceImpl implements DocumentService {
                         patientId
                 ).orElseThrow(() -> new RuntimeException("Document not found"));
 
+        accessControl.requirePatientAccess(document.getPatient());
+
         return modelMapper.map(document, DocumentDto.class);
     }
 
@@ -82,6 +88,8 @@ public class DocumentServiceImpl implements DocumentService {
 
         Document document = documentRepository.findByIdAndPatientId(documentId, patientId).orElseThrow(() ->
                         new RuntimeException("Document not found"));
+
+        accessControl.requirePatientAccess(document.getPatient());
 
         documentRepository.delete(document);
     }

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import com.antss_prescription.entity.prescription.Patient;
 import com.antss_prescription.repository.prescription.PatientRepo;
+import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.service.PatientService;
 
 @Service
@@ -16,9 +17,14 @@ import com.antss_prescription.service.PatientService;
 public class PatientServiceImpl implements PatientService {
 
     private final PatientRepo patientRepo;
+    private final AccessControlService accessControl;
 
     @Override
     public Patient savePatient(Patient patient) {
+
+        // Normal patient creation happens through patient registration, where a
+        // facility relationship can be established immediately.
+        accessControl.requireAdmin();
 
         patient.setCreatedAt(LocalDateTime.now());
         patient.setUpdatedAt(LocalDateTime.now());
@@ -29,14 +35,19 @@ public class PatientServiceImpl implements PatientService {
     @Override
     public Patient getPatientById(Integer patientId) {
 
-        return patientRepo.findById(patientId)
+        Patient patient = patientRepo.findById(patientId)
                 .orElseThrow(() -> new RuntimeException("Patient not found with id : " + patientId));
+        accessControl.requirePatientAccess(patient);
+        return patient;
     }
 
     @Override
     public List<Patient> getAllPatients() {
 
-        return patientRepo.findAll();
+        var user = accessControl.currentUser();
+        return patientRepo.findAll().stream()
+                .filter(patient -> accessControl.canAccess(patient, user))
+                .toList();
     }
 
     @Override
@@ -44,6 +55,8 @@ public class PatientServiceImpl implements PatientService {
 
         Patient existingPatient = patientRepo.findById(patientId)
                 .orElseThrow(() -> new RuntimeException("Patient not found with id : " + patientId));
+
+        accessControl.requirePatientAccess(existingPatient);
 
         existingPatient.setPatientName(patient.getPatientName());
         existingPatient.setMobileNumber(patient.getMobileNumber());
@@ -65,6 +78,8 @@ public class PatientServiceImpl implements PatientService {
 
         Patient patient = patientRepo.findById(patientId)
                 .orElseThrow(() -> new RuntimeException("Patient not found with id : " + patientId));
+
+        accessControl.requirePatientAccess(patient);
 
         patientRepo.delete(patient);
     }

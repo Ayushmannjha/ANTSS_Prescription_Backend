@@ -12,6 +12,7 @@ import com.antss_prescription.repository.LoginCredentialRepository;
 import com.antss_prescription.repository.RmoRepository;
 import com.antss_prescription.repository.UserSubscriptionRepository;
 import com.antss_prescription.repository.UserRepository;
+import com.antss_prescription.repository.LoginSessionRepository;
 import com.antss_prescription.service.RmoService;
 import com.antss_prescription.service.EmailService;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class RmoServiceImpl implements RmoService {
     private final UserRepository userRepository;
     private final UserSubscriptionRepository userSubscriptionRepository;
     private final LoginCredentialRepository loginCredentialRepository;
+    private final LoginSessionRepository loginSessionRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final ModelMapper modelMapper;
@@ -162,6 +164,11 @@ public class RmoServiceImpl implements RmoService {
         if (rmo.getUser() != null) {
             rmo.getUser().setStatus(RegistrationStatus.INACTIVE);
             userRepository.save(rmo.getUser());
+            loginCredentialRepository.findByUserId(rmo.getUser().getId()).ifPresent(credential -> {
+                credential.setLoginStatus(LoginStatus.BLOCKED);
+                loginCredentialRepository.save(credential);
+            });
+            loginSessionRepository.expireAllSessionsForUser(rmo.getUser());
         }
         rmoRepository.save(rmo);
         log.info("Rmo marked inactive: {}", rmo.getRmoName());

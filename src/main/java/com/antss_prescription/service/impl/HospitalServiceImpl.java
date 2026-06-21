@@ -130,7 +130,8 @@ public class HospitalServiceImpl implements HospitalService {
         Hospital hospital = hospitalRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hospital", id));
         
-        boolean hasAccess = hospital.getUser().getId().equals(userId);
+        boolean hasAccess = hospital.getUser().getId().equals(userId)
+                || (hospital.getOwner() != null && hospital.getOwner().getId().equals(userId));
         if (!hasAccess) {
             // Check if user is a doctor of this hospital
             hasAccess = doctorRepository.findByUserId(userId)

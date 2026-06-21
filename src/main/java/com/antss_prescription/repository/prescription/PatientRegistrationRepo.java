@@ -16,6 +16,7 @@ public interface PatientRegistrationRepo extends JpaRepository<PatientRegistrati
 
 	List<PatientRegistration> findByClinic(Clinic clinic);
 	List<PatientRegistration> findByHospital(Hospital hospital);
+	List<PatientRegistration> findByPatient(Patient patient);
 	List<PatientRegistration> findByRegistrationNumberStartingWith(String prefix);
 	 boolean existsByPatientAndClinic(Patient patient, Clinic clinic);
 	    boolean existsByPatientAndHospital(Patient patient, Hospital hospital);

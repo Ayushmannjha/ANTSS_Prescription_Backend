@@ -48,6 +48,8 @@ import com.antss_prescription.repository.UserRepository;
 import com.antss_prescription.repository.UserSubscriptionRepository;
 import com.antss_prescription.security.ApprovalTokenUtils;
 import com.antss_prescription.security.JwtTokenProvider;
+import com.antss_prescription.security.AccessControlService;
+import com.antss_prescription.enums.LoginStatus;
 import com.antss_prescription.service.AuthService;
 import com.antss_prescription.service.EmailService;
 
@@ -71,6 +73,7 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService emailService;
     private final DoctorRepository doctorRepository;
     private final RmoRepository rmoRepository;
+    private final AccessControlService accessControl;
 
     @Value("${app.admin.email}")
     private String adminEmail;
@@ -256,6 +259,10 @@ public void register(RegisterRequest request) {
                 ()-> new BusinessException("login credentials not found for the user, please contact admin")
         );
 
+        if (credential.getLoginStatus() != LoginStatus.ACTIVE) {
+            throw new UnauthorizedException("Login is disabled for this account");
+        }
+
         if (!passwordEncoder.matches(request.getPassword(), credential.getPasswordHash())) {
             throw new UnauthorizedException("Invalid email or password");
         }
@@ -270,72 +277,27 @@ public void register(RegisterRequest request) {
             throw new UnauthorizedException("Your account is inactive or expired.");
         }
 
-        List<UserSubscription> activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(user.getId(), SubscriptionStatus.ACTIVE);
-        System.out.println("===printintg usertype==="+user.getUserType());
-        if (user.getUserType().equals(UserType.DOCTOR)) {
-            Doctor doctor = doctorRepository.findByUserId(user.getId())
-                    .orElseThrow(() -> new UnauthorizedException("Doctor profile not found for user: " + user.getEmail()));
-            Hospital hospital = doctor.getHospital();
-            Clinic clinic = doctor.getClinic();
-
-            if (hospital != null) {
-                UUID hospitalUserId = hospital.getUser().getId();
-                System.out.println("====hospital is not empty====" + hospitalUserId);
-                activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(
-                        hospitalUserId, SubscriptionStatus.ACTIVE);
-            } else if (clinic != null) {
-                UUID clinicUserId = clinic.getUser().getId();
-                System.out.println("====Clinic is not empty====" + clinicUserId);
-                activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(
-                        clinicUserId, SubscriptionStatus.ACTIVE);
-            } else {
-                throw new RuntimeException("Doctor is not associated with any Hospital or Clinic");
-            }
-        } else if (user.getUserType().equals(UserType.RMO)) {
-            Rmo rmo = rmoRepository.findByUserId(user.getId())
-                    .orElseThrow(() -> new UnauthorizedException("RMO profile not found for user: " + user.getEmail()));
-            Hospital hospital = rmo.getHospital();
-            Clinic clinic = rmo.getClinic();
-
-            if (hospital != null) {
-                UUID hospitalOwnerId = hospital.getOwner() != null
-                        ? hospital.getOwner().getId()
-                        : hospital.getUser().getId();
-                activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(
-                        hospitalOwnerId, SubscriptionStatus.ACTIVE);
-            } else if (clinic != null) {
-                UUID clinicOwnerId = clinic.getOwner() != null
-                        ? clinic.getOwner().getId()
-                        : clinic.getUser().getId();
-                activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(
-                        clinicOwnerId, SubscriptionStatus.ACTIVE);
-            } else {
-                throw new RuntimeException("RMO is not associated with any Hospital or Clinic");
-            }
-        }
+        User subscriptionOwner = user.getRole() == Role.ROLE_ADMIN
+                ? user : accessControl.resolveSubscriptionOwner(user);
+        List<UserSubscription> activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(
+                subscriptionOwner.getId(), SubscriptionStatus.ACTIVE);
         
         boolean hasValidSub = false;
         LocalDate today = LocalDate.now();
-        System.out.println("=======Doctor login Subscription checker=======");
-        System.out.println(activeSubs);
         for (UserSubscription sub : activeSubs) {
-        	System.out.println(sub.getEndDate());
             if (today.isAfter(sub.getEndDate())) {
                 sub.setSubscriptionStatus(SubscriptionStatus.EXPIRED);
                 userSubscriptionRepository.save(sub);
                 log.info("Subscription {} expired for user {}", sub.getId(), user.getEmail());
-            } else {
+            } else if (sub.getPaymentStatus() == PaymentStatus.PAID) {
                 hasValidSub = true;
             }
         }
 
         if (!hasValidSub && !user.getRole().equals(Role.ROLE_ADMIN)) {
 
-            user.setStatus(RegistrationStatus.EXPIRED);
-            userRepository.save(user);
             loginSessionRepository.expireAllSessionsForUser(user);
-            emailService.sendExpiryReminderEmail(user.getEmail(), user.getFullName());
-            throw new UnauthorizedException("Your subscription has expired");
+            throw new UnauthorizedException("No active paid subscription is available for this account");
         }
 
 
@@ -424,13 +386,41 @@ public void register(RegisterRequest request) {
             throw new UnauthorizedException("Refresh token has expired");
         }
 
+        if (!"refresh".equals(jwtTokenProvider.getTokenType(request.getRefreshToken()))) {
+            expireSession(session);
+            throw new UnauthorizedException("Invalid refresh token type");
+        }
+
         User user = session.getUser();
+        LoginCredential credential = loginCredentialRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new UnauthorizedException("Login credentials are unavailable"));
+        if (user.getStatus() != RegistrationStatus.APPROVED
+                || credential.getLoginStatus() != LoginStatus.ACTIVE
+                || !hasValidSubscriptionFor(user)) {
+            expireSession(session);
+            throw new UnauthorizedException("Account or subscription is no longer active");
+        }
         String newAccessToken = jwtTokenProvider.generateAccessToken(user.getEmail());
 
         session.setToken(newAccessToken);
         loginSessionRepository.save(session);
 
         return new AuthResponse(newAccessToken, request.getRefreshToken(), mapToUserResponse(user));
+    }
+
+    private boolean hasValidSubscriptionFor(User user) {
+        if (user.getRole() == Role.ROLE_ADMIN) return true;
+        User owner = accessControl.resolveSubscriptionOwner(user);
+        LocalDate today = LocalDate.now();
+        return userSubscriptionRepository.findByUserIdAndSubscriptionStatus(
+                        owner.getId(), SubscriptionStatus.ACTIVE).stream()
+                .anyMatch(sub -> !today.isAfter(sub.getEndDate())
+                        && sub.getPaymentStatus() == PaymentStatus.PAID);
+    }
+
+    private void expireSession(LoginSession session) {
+        session.setExpired(true);
+        loginSessionRepository.save(session);
     }
 
     private UserResponse mapToUserResponse(User user) {

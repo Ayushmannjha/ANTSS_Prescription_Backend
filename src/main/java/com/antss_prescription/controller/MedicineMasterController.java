@@ -1,7 +1,6 @@
 package com.antss_prescription.controller;
 
 import java.util.List;
-import java.util.UUID;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.antss_prescription.entity.prescription.MedicineMaster;
 import com.antss_prescription.service.MedicineMasterService;
+import com.antss_prescription.security.AccessControlService;
 
 @RestController
 @RequestMapping("/api/medicines")
@@ -25,48 +25,45 @@ import com.antss_prescription.service.MedicineMasterService;
 public class MedicineMasterController {
 
     private final MedicineMasterService medicineService;
+    private final AccessControlService accessControl;
 
     @PostMapping
     public ResponseEntity<MedicineMaster> saveMedicine(
-            @Valid @RequestBody MedicineMaster medicine,
-            @RequestParam UUID userId) {
+            @Valid @RequestBody MedicineMaster medicine) {
 
         return ResponseEntity.ok(
-                medicineService.saveMedicine(medicine, userId));
+                medicineService.saveMedicine(medicine, accessControl.currentUser().getId()));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<MedicineMaster> getMedicineById(
-            @PathVariable Long id,
-            @RequestParam UUID userId) {
+            @PathVariable Long id) {
 
         return ResponseEntity.ok(
-                medicineService.getMedicineById(id, userId));
+                medicineService.getMedicineById(id, accessControl.currentUser().getId()));
     }
 
     @GetMapping
     public ResponseEntity<List<MedicineMaster>> getAllMedicines(
-            @RequestParam UUID userId) {
+            ) {
 
         return ResponseEntity.ok(
-                medicineService.getAllMedicines(userId));
+                medicineService.getAllMedicines(accessControl.currentUser().getId()));
     }
 
     @GetMapping("/search")
     public ResponseEntity<List<MedicineMaster>> searchMedicine(
-            @RequestParam String keyword,
-            @RequestParam UUID userId) {
+            @RequestParam String keyword) {
 
         return ResponseEntity.ok(
-                medicineService.searchMedicine(keyword, userId));
+                medicineService.searchMedicine(keyword, accessControl.currentUser().getId()));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteMedicine(
-            @PathVariable Long id,
-            @RequestParam UUID userId) {
+            @PathVariable Long id) {
 
-        medicineService.deleteMedicine(id, userId);
+        medicineService.deleteMedicine(id, accessControl.currentUser().getId());
 
         return ResponseEntity.ok("Medicine deleted successfully");
     }
