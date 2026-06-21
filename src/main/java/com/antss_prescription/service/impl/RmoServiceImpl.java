@@ -263,6 +263,7 @@ public class RmoServiceImpl implements RmoService {
         return response;
     }
 
+
     private String generateSecurePassword(int length) {
         final String CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$!";
         SecureRandom random = new SecureRandom();
