@@ -128,7 +128,6 @@ public class RmoServiceImpl implements RmoService {
         credential.setUsername(request.getEmail());
         credential.setPasswordHash(passwordEncoder.encode(plainPassword));
         loginCredentialRepository.save(credential);
-        String setupToken = passwordResetTokenService.issue(savedRmoUser);
 
         rmo.setUser(savedRmoUser);
 
@@ -138,7 +137,6 @@ public class RmoServiceImpl implements RmoService {
                 request.getEmail(),
                 request.getRmoName(),
                 request.getEmail(),
-                setupToken,
                 "RMO",
                 subEndDate
         );

@@ -89,7 +89,6 @@ public class HospitalServiceImpl implements HospitalService {
         credential.setUsername(request.getEmail());
         credential.setPasswordHash(passwordEncoder.encode(plainPassword));
         loginCredentialRepository.save(credential);
-        String setupToken = passwordResetTokenService.issue(savedHospitalUser);
 
         Hospital hospital = new Hospital();
         hospital.setHospitalName(request.getHospitalName());
@@ -110,7 +109,6 @@ public class HospitalServiceImpl implements HospitalService {
                 request.getEmail(),
                 request.getHospitalName(),
                 request.getEmail(),
-                setupToken,
                 "Hospital",
                 subEndDate
         );

@@ -89,7 +89,6 @@ public class ClinicServiceImpl implements ClinicService {
         credential.setUsername(request.getEmail());
         credential.setPasswordHash(passwordEncoder.encode(plainPassword));
         loginCredentialRepository.save(credential);
-        String setupToken = passwordResetTokenService.issue(savedClinicUser);
 
         Clinic clinic = new Clinic();
         clinic.setClinicName(request.getClinicName());
@@ -111,7 +110,6 @@ public class ClinicServiceImpl implements ClinicService {
                 request.getEmail(),
                 request.getClinicName(),
                 request.getEmail(),
-                setupToken,
                 "Clinic",
                 subEndDate
         );

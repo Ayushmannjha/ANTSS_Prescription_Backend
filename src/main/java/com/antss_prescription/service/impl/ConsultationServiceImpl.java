@@ -93,7 +93,6 @@ public class ConsultationServiceImpl implements ConsultationService {
             }
         }
 
-        // Save Vitals
         if (consultation.getVitals() != null) {
             Vitals vitals = consultation.getVitals();
             vitals.setCreatedAt(LocalDateTime.now());
@@ -116,9 +115,6 @@ public class ConsultationServiceImpl implements ConsultationService {
         return mapToResponse(consultation);
     }
 
-    // ─────────────────────────────────────────────
-    // READ — all
-    // ─────────────────────────────────────────────
     @Override
     public List<ConsultationResponse> getAllConsultations() {
         var scope = accessControl.currentClinicalScope();

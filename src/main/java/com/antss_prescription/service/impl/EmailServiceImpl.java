@@ -124,15 +124,14 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public void sendApprovalEmail(String toEmail, String fullName, String setupToken) {
+    public void sendApprovalEmail(String toEmail, String fullName) {
         String subject = "Account Approved - Antss Prescription";
         String body = "Dear " + fullName + ",\n\n" +
                 "Your account has been approved. You can now log in to the Antss Prescription portal.\n\n" +
-                "Your username and one-time password setup token:\n" +
                 "Username: " + toEmail + "\n" +
-                "Setup Token: " + setupToken + "\n\n" +
-                "Use this token with the reset-password endpoint within 1 hour to choose your password.\n\n" +
-                "Thank you for choosing Antss Prescription.";
+                " We value our client credentials and hence we have approved you in the system " +
+                "but please create your own password using the forgot password reset link to enter the application"+
+               "Thank you for choosing Antss Prescription.";
         sendEmail(toEmail, subject, body);
     }
 
@@ -166,15 +165,15 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public void sendCredentialsEmail(String toEmail, String entityName, String username, String setupToken, String roleName, java.time.LocalDate endDate) {
+    public void sendCredentialsEmail(String toEmail, String entityName, String username, String roleName, java.time.LocalDate endDate) {
         String subject = "Access Credentials - Antss Prescription";
         String body = "Dear " + entityName + ",\n\n" +
                 "You have been added to the Antss Prescription portal as a " + roleName + ".\n\n" +
                 "Your account setup details:\n" +
                 "Username/Email: " + username + "\n" +
-                "Setup Token: " + setupToken + "\n\n" +
                 "Your subscription / validity is active until: " + endDate + "\n\n" +
-                "Use this token with the reset-password endpoint within 1 hour to choose your password.\n\n" +
+                "We value our client's privcacy but we have authorized you by this email so please create your own password through the password reset before login" +
+                " Use this token with the reset-password endpoint within 1 hour to choose your password.\n\n" +
                 "Thank you.";
         sendEmail(toEmail, subject, body);
     }

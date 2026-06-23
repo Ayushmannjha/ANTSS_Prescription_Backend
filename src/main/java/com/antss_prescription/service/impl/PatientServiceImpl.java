@@ -27,10 +27,6 @@ public class PatientServiceImpl implements PatientService {
     @Override
     public Patient savePatient(Patient patient) {
 
-        // Normal patient creation happens through patient registration, where a
-        // facility relationship can be established immediately.
-        accessControl.requireAdmin();
-
         patient.setCreatedAt(LocalDateTime.now());
         patient.setUpdatedAt(LocalDateTime.now());
 

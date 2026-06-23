@@ -117,7 +117,7 @@ public class DoctorServiceImpl implements DoctorService {
         doctorUser.setFullName(request.getDoctorName());
         doctorUser.setEmail(request.getEmail());
         doctorUser.setMobileNumber(request.getMobileNumber());
-        // doctorUser.setPassword(passwordEncoder.encode(plainPassword));
+
         doctorUser.setUserType(UserType.DOCTOR);
         doctorUser.setStatus(RegistrationStatus.APPROVED);
         doctorUser.setRole(Role.ROLE_USER);
@@ -127,8 +127,8 @@ public class DoctorServiceImpl implements DoctorService {
         credential.setUser(savedDoctorUser);
         credential.setUsername(request.getEmail());
         credential.setPasswordHash(passwordEncoder.encode(plainPassword));
+
         loginCredentialRepository.save(credential);
-        String setupToken = passwordResetTokenService.issue(savedDoctorUser);
 
         Doctor doctor = new Doctor();
         doctor.setDoctorName(request.getDoctorName());
@@ -158,7 +158,6 @@ public class DoctorServiceImpl implements DoctorService {
                 request.getEmail(),
                 request.getDoctorName(),
                 request.getEmail(),
-                setupToken,
                 "Doctor",
                 subEndDate);
 

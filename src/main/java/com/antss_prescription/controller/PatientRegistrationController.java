@@ -37,13 +37,28 @@ public class PatientRegistrationController {
 
     // Create Registration
     @PostMapping
-    public ResponseEntity<PatientRegistration> saveRegistration(
+    public ResponseEntity<PatientRegistrationResponse> saveRegistration(
             @Valid @RequestBody PatientRegistrationRequest request) {
 
         PatientRegistration savedRegistration =
                 patientRegistrationService.saveRegistration(ClinicalRequestMapper.toRegistration(request));
 
-        return ResponseEntity.ok(savedRegistration);
+        PatientRegistrationResponse response = new PatientRegistrationResponse();
+        response.setRegistrationId(savedRegistration.getRegistrationId());
+        response.setRegistrationNumber(savedRegistration.getRegistrationNumber());
+        response.setPatient(savedRegistration.getPatient());
+
+        if (savedRegistration.getClinic() != null) {
+            response.setClinicId(savedRegistration.getClinic().getId());
+            response.setClinicName(savedRegistration.getClinic().getClinicName());
+        }
+
+        if (savedRegistration.getHospital() != null) {
+            response.setHospitalId(savedRegistration.getHospital().getId());
+            response.setHospitalName(savedRegistration.getHospital().getHospitalName());
+        }
+
+        return ResponseEntity.ok(response);
     }
 
     // Get Registration By Id
