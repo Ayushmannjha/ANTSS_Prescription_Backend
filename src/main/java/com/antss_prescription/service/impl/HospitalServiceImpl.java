@@ -13,6 +13,7 @@ import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.repository.*;
 import com.antss_prescription.service.EmailService;
 import com.antss_prescription.service.HospitalService;
+import com.antss_prescription.security.PasswordResetTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -39,6 +40,7 @@ public class HospitalServiceImpl implements HospitalService {
     private final PasswordEncoder passwordEncoder;
     private final ModelMapper modelMapper;
     private final DoctorRepository doctorRepository;
+    private final PasswordResetTokenService passwordResetTokenService;
 
 
     @Override
@@ -51,7 +53,10 @@ public class HospitalServiceImpl implements HospitalService {
         }
 
         List<UserSubscription> activeSubs = userSubscriptionRepository
-                .findByUserIdAndSubscriptionStatus(ownerId, SubscriptionStatus.ACTIVE);
+                .findValidByUserIdForUpdate(ownerId, java.time.LocalDate.now());
+        if (activeSubs.isEmpty()) {
+            throw new BusinessException("An active paid subscription is required to create a hospital");
+        }
         int totalAllowedHospitals = activeSubs.stream()
                 .mapToInt(UserSubscription::getAllowedHospitals).sum();
         int currentHospitals = hospitalRepository.findByOwnerId(ownerId).size();
@@ -61,9 +66,7 @@ public class HospitalServiceImpl implements HospitalService {
                     "). Upgrade your plan to add more hospitals.");
         }
 
-        java.time.LocalDate subEndDate = activeSubs.isEmpty()
-                ? java.time.LocalDate.now().plusYears(1)
-                : activeSubs.get(0).getEndDate();
+        java.time.LocalDate subEndDate = activeSubs.get(0).getEndDate();
 
 
         int allowedDoctors = activeSubs.stream()
@@ -86,6 +89,7 @@ public class HospitalServiceImpl implements HospitalService {
         credential.setUsername(request.getEmail());
         credential.setPasswordHash(passwordEncoder.encode(plainPassword));
         loginCredentialRepository.save(credential);
+        String setupToken = passwordResetTokenService.issue(savedHospitalUser);
 
         Hospital hospital = new Hospital();
         hospital.setHospitalName(request.getHospitalName());
@@ -106,7 +110,7 @@ public class HospitalServiceImpl implements HospitalService {
                 request.getEmail(),
                 request.getHospitalName(),
                 request.getEmail(),
-                plainPassword,
+                setupToken,
                 "Hospital",
                 subEndDate
         );

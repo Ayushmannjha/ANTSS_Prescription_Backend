@@ -30,4 +30,9 @@ public class CreateRmoRequest {
 
     @NotNull
     private RmoRole role;
+
+    @AssertTrue(message = "hospitalId and clinicId cannot both be provided")
+    public boolean isFacilitySelectionValid() {
+        return hospitalId == null || clinicId == null;
+    }
 }

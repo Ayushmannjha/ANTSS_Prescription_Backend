@@ -1,5 +1,8 @@
 package com.antss_prescription.security;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.antss_prescription.entity.Clinic;
 import com.antss_prescription.entity.Doctor;
 import com.antss_prescription.entity.Hospital;
@@ -182,6 +185,34 @@ public class AccessControlService {
     public void requireAdmin() {
         if (!isAdmin(currentUser())) throw new ForbiddenException("Administrator access is required");
     }
+
+    public ClinicalScope currentClinicalScope() {
+        User user = currentUser();
+        if (isAdmin(user)) return new ClinicalScope(true, List.of(), List.of());
+
+        List<Long> hospitalIds = new ArrayList<>(hospitalRepository
+                .findByUserIdOrOwnerId(user.getId(), user.getId()).stream()
+                .map(Hospital::getId).toList());
+        List<Long> clinicIds = new ArrayList<>(clinicRepository
+                .findByUserIdOrOwnerId(user.getId(), user.getId()).stream()
+                .map(Clinic::getId).toList());
+
+        doctorRepository.findByUserId(user.getId()).ifPresent(doctor -> {
+            if (doctor.getHospital() != null) hospitalIds.add(doctor.getHospital().getId());
+            if (doctor.getClinic() != null) clinicIds.add(doctor.getClinic().getId());
+        });
+        rmoRepository.findByUserId(user.getId()).ifPresent(rmo -> {
+            if (rmo.getHospital() != null) hospitalIds.add(rmo.getHospital().getId());
+            if (rmo.getClinic() != null) clinicIds.add(rmo.getClinic().getId());
+        });
+
+        if (hospitalIds.isEmpty()) hospitalIds.add(-1L);
+        if (clinicIds.isEmpty()) clinicIds.add(-1L);
+        return new ClinicalScope(false, hospitalIds.stream().distinct().toList(),
+                clinicIds.stream().distinct().toList());
+    }
+
+    public record ClinicalScope(boolean admin, List<Long> hospitalIds, List<Long> clinicIds) {}
 
     private User ownerOf(Hospital hospital, Clinic clinic) {
         if (hospital != null) return hospital.getOwner() != null ? hospital.getOwner() : hospital.getUser();

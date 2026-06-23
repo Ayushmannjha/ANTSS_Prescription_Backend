@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.antss_prescription.entity.prescription.MedicineMaster;
+import com.antss_prescription.dto.request.MedicineMasterRequest;
 import com.antss_prescription.service.MedicineMasterService;
 import com.antss_prescription.security.AccessControlService;
 
@@ -29,7 +30,15 @@ public class MedicineMasterController {
 
     @PostMapping
     public ResponseEntity<MedicineMaster> saveMedicine(
-            @Valid @RequestBody MedicineMaster medicine) {
+            @Valid @RequestBody MedicineMasterRequest request) {
+
+        MedicineMaster medicine = new MedicineMaster();
+        medicine.setMedicineName(request.getMedicineName());
+        medicine.setGenericName(request.getGenericName());
+        medicine.setStrength(request.getStrength());
+        medicine.setDosageForm(request.getDosageForm());
+        medicine.setManufacturer(request.getManufacturer());
+        medicine.setActive(request.getActive() == null ? Boolean.TRUE : request.getActive());
 
         return ResponseEntity.ok(
                 medicineService.saveMedicine(medicine, accessControl.currentUser().getId()));

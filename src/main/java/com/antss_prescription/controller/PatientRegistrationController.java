@@ -15,12 +15,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.antss_prescription.dto.response.PatientRegistrationResponse;
+import com.antss_prescription.dto.request.PatientRegistrationRequest;
+import com.antss_prescription.dto.request.ClinicalRequestMapper;
 import com.antss_prescription.entity.Clinic;
 import com.antss_prescription.entity.Hospital;
 import com.antss_prescription.entity.prescription.PatientRegistration;
 import com.antss_prescription.repository.ClinicRepository;
 import com.antss_prescription.repository.HospitalRepository;
 import com.antss_prescription.service.PatientRegistrationService;
+import com.antss_prescription.exception.ResourceNotFoundException;
 
 @RestController
 @RequestMapping("/api/patient-registrations")
@@ -35,10 +38,10 @@ public class PatientRegistrationController {
     // Create Registration
     @PostMapping
     public ResponseEntity<PatientRegistration> saveRegistration(
-            @Valid @RequestBody PatientRegistration registration) {
+            @Valid @RequestBody PatientRegistrationRequest request) {
 
         PatientRegistration savedRegistration =
-                patientRegistrationService.saveRegistration(registration);
+                patientRegistrationService.saveRegistration(ClinicalRequestMapper.toRegistration(request));
 
         return ResponseEntity.ok(savedRegistration);
     }
@@ -66,26 +69,28 @@ public class PatientRegistrationController {
     @GetMapping("/clinic/{clinicId}")
     public ResponseEntity<List<PatientRegistrationResponse>> getByClinic(
             @PathVariable Long clinicId) {
-        Clinic clinic = clinicRepository.findById(clinicId).get();
+        Clinic clinic = clinicRepository.findById(clinicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Clinic", clinicId));
         return ResponseEntity.ok(patientRegistrationService.getAllRegistrationsByClinic(clinic));
     }
 
     @GetMapping("/hospital/{hospitalId}")
     public ResponseEntity<List<PatientRegistrationResponse>> getByHospital(
             @PathVariable Long hospitalId) {
-        Hospital hospital = hospitalRepository.findById(hospitalId).get();
+        Hospital hospital = hospitalRepository.findById(hospitalId)
+                .orElseThrow(() -> new ResourceNotFoundException("Hospital", hospitalId));
         return ResponseEntity.ok(patientRegistrationService.getAllRegistrationsByHospital(hospital));
     }
     // Update Registration
     @PutMapping("/{registrationId}")
     public ResponseEntity<PatientRegistrationResponse> updateRegistration(
             @PathVariable Integer registrationId,
-            @Valid @RequestBody PatientRegistration registration) {
+            @Valid @RequestBody PatientRegistrationRequest request) {
     	
     	PatientRegistrationResponse updatedRegistration =
                 patientRegistrationService.updateRegistration(
                         registrationId,
-                        registration);
+                        ClinicalRequestMapper.toRegistration(request));
 
         return ResponseEntity.ok(updatedRegistration);
     }

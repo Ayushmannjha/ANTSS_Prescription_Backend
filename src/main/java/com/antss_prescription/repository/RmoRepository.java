@@ -16,6 +16,4 @@ public interface RmoRepository extends JpaRepository<Rmo, UUID> {
     Optional<Rmo> findByUserId(UUID userId);
     List<Rmo> findByHospital(Hospital hospital);
     List<Rmo> findByClinic(Clinic clinic);
-    List<Rmo> findByHospitalId(Long hospitalId);
-    List<Rmo> findByClinicId(Long clinicId);
 }

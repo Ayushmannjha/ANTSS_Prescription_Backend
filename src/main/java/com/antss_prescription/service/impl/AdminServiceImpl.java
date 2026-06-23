@@ -25,7 +25,9 @@ import com.antss_prescription.entity.SubscriptionPackage;
 import com.antss_prescription.entity.User;
 import com.antss_prescription.entity.UserSubscription;
 import com.antss_prescription.enums.AddonApprovalStatus;
+import com.antss_prescription.enums.AllocationStatus;
 import com.antss_prescription.enums.DurationType;
+import com.antss_prescription.enums.FacilityType;
 import com.antss_prescription.enums.PaymentStatus;
 import com.antss_prescription.enums.RegistrationStatus;
 import com.antss_prescription.enums.SubscriptionStatus;
@@ -40,8 +42,10 @@ import com.antss_prescription.repository.LoginSessionRepository;
 import com.antss_prescription.repository.PackageRepository;
 import com.antss_prescription.repository.UserRepository;
 import com.antss_prescription.repository.UserSubscriptionRepository;
+import com.antss_prescription.repository.SubscriptionDoctorAllocationRepository;
 import com.antss_prescription.service.AdminService;
 import com.antss_prescription.service.EmailService;
+import com.antss_prescription.security.PasswordResetTokenService;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -62,6 +66,9 @@ public class AdminServiceImpl implements AdminService {
     private final ModelMapper modelMapper;
     private final PasswordEncoder passwordEncoder;
     private final LoginCredentialRepository loginCredentialRepository;
+    private final SubscriptionDoctorAllocationRepository allocationRepository;
+    private final LinkedAccountStatusService linkedAccountStatusService;
+    private final PasswordResetTokenService passwordResetTokenService;
 
 
     @Override
@@ -74,7 +81,8 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public UserResponse approveUser(UUID userId) {
-        User user = getUserOrThrow(userId);
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
 
         if (user.getStatus() != RegistrationStatus.PENDING) {
             throw new BusinessException("Only PENDING registrations can be approved");
@@ -94,6 +102,7 @@ public class AdminServiceImpl implements AdminService {
         credential.setUsername(saved.getEmail());
         credential.setPasswordHash(encodedPassword);
         loginCredentialRepository.save(credential);
+        String setupToken = passwordResetTokenService.issue(saved);
 
         LocalDate subEndDate = LocalDate.now().plusYears(1); // fallback
         List<UserSubscription> subscriptions = userSubscriptionRepository.findByUserId(userId);
@@ -119,7 +128,7 @@ public class AdminServiceImpl implements AdminService {
             updateEntityMaxDoctorLimit(user, sub.getAllowedDoctors());
         }
 
-        emailService.sendApprovalEmail(user.getEmail(), user.getFullName(), plainPassword);
+        emailService.sendApprovalEmail(user.getEmail(), user.getFullName(), setupToken);
         log.info("User approved and credentials emailed: {}", user.getEmail());
         return mapToUserResponse(saved);
     }
@@ -151,14 +160,25 @@ public class AdminServiceImpl implements AdminService {
             throw new BusinessException("Selected package is not active");
         }
 
-        List<UserSubscription> activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(userId, SubscriptionStatus.ACTIVE);
+        List<UserSubscription> activeSubs = userSubscriptionRepository.findValidByUserIdForUpdate(
+                userId, LocalDate.now());
         if (activeSubs.isEmpty()) {
             throw new BusinessException("User has no active subscription to modify");
         }
 
         UserSubscription sub = activeSubs.get(0);
+        int activeAllocations = Math.toIntExact(allocationRepository
+                .countByUserSubscriptionIdAndStatus(sub.getId(), AllocationStatus.ACTIVE));
+        int activeAddonDoctors = doctorAddonRepository.findApprovedAndPaidBySubscriptionId(sub.getId()).stream()
+                .filter(addon -> !addon.getEndDate().isBefore(LocalDate.now()))
+                .mapToInt(DoctorAddon::getAdditionalDoctors)
+                .sum();
+        int newAllowedDoctors = newPkg.getBaseDoctorLimit() + activeAddonDoctors;
+        if (newAllowedDoctors < activeAllocations) {
+            throw new BusinessException("Package allows fewer doctors than are currently allocated");
+        }
         sub.setSubscriptionPackage(newPkg);
-        sub.setAllowedDoctors(newPkg.getBaseDoctorLimit()); // Reset allowed doctor count to new package base limit
+        sub.setAllowedDoctors(newAllowedDoctors);
         
         LocalDate endDate = sub.getStartDate();
         if (newPkg.getDurationType() == DurationType.SIX_MONTH) {
@@ -181,21 +201,17 @@ public class AdminServiceImpl implements AdminService {
     public UserResponse extendValidity(UUID userId, ExtendValidityRequest request) {
         User user = getUserOrThrow(userId);
 
-        List<UserSubscription> activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(userId, SubscriptionStatus.ACTIVE);
-        if (activeSubs.isEmpty()) {
-            throw new BusinessException("User does not have an active subscription to extend");
-        }
-
-        UserSubscription sub = activeSubs.get(0);
+        UserSubscription sub = userSubscriptionRepository.findByUserIdForUpdate(userId).stream()
+                .max(java.util.Comparator.comparing(UserSubscription::getEndDate))
+                .orElseThrow(() -> new BusinessException("User does not have a subscription to extend"));
         LocalDate currentEnd = sub.getEndDate();
         LocalDate base = currentEnd.isBefore(LocalDate.now()) ? LocalDate.now() : currentEnd;
         sub.setEndDate(base.plusDays(request.getDays()));
+        sub.setPaymentStatus(PaymentStatus.PAID);
+        sub.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
         userSubscriptionRepository.save(sub);
 
-        if (user.getStatus() == RegistrationStatus.EXPIRED) {
-            user.setStatus(RegistrationStatus.APPROVED);
-            userRepository.save(user);
-        }
+        linkedAccountStatusService.reactivateOwnerAndSubscriptionExpiredAccounts(user);
 
         log.info("Validity extended for user: {} by {} days", user.getEmail(), request.getDays());
         return mapToUserResponse(user);
@@ -222,61 +238,13 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public List<DoctorAddonResponse> getPendingAddons() {
-    	List<DoctorAddon> addons =
-    		    doctorAddonRepository.findByApprovalStatus(AddonApprovalStatus.PENDING);
-    	
-    	List<DoctorAddonResponse> responses = addons.stream()
-    	        .map(this::mapToAddonResponse)
-    	        .collect(Collectors.toList());
-    	
-    	for(DoctorAddonResponse addon:responses) {
-    		User user  =(userSubscriptionRepository.findById(addon.getUserSubscriptionId())).get().getUser();
-    	UserSubscription usersubscription=	userSubscriptionRepository.findById(addon.getUserSubscriptionId()).get();
-    	Clinic clinic = clinicRepository.findById(usersubscription.getEntityId()).orElse(null);
-    	Hospital hospital = hospitalRepository.findById(usersubscription.getEntityId()).orElse(null);
-    	addon.setUsername(user.getFullName());
-    		addon.setUserEmail(user.getEmail());
-    		addon.setEntityName(
-    			    clinic != null
-    			        ? clinic.getClinicName()
-    			        : hospital != null
-    			            ? hospital.getHospitalName()
-    			            : null
-    			);
-    		addon.setState(clinic != null
-    			        ? clinic.getState()
-    			        : hospital != null
-    			            ? hospital.getState()
-    			            : null);
-    		addon.setCity(clinic != null
-    			        ? clinic.getCity()
-    			        : hospital != null
-    			            ? hospital.getCity()
-    			            : null);
-    		addon.setEntityType(
-    			    clinic != null
-    			        ? "CLINIC"
-    			        : hospital != null
-    			            ? "HOSPITAL"
-    			            : null
-    			);
-    		addon.setCity(clinic != null
-			        ? clinic.getAddressLine1()
-			        : hospital != null
-			            ? hospital.getAddressLine1()
-			            : null);
-    		
-    	}
-    	
-	
-
-    	
-    	return responses;
+        return doctorAddonRepository.findByApprovalStatus(AddonApprovalStatus.PENDING)
+                .stream().map(this::mapToAddonResponse).collect(Collectors.toList());
     }
 
     @Override
     public DoctorAddonResponse approveDoctorAddon(Long addonId, UUID adminUserId) {
-        DoctorAddon addon = doctorAddonRepository.findById(addonId)
+        DoctorAddon addon = doctorAddonRepository.findByIdForUpdate(addonId)
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor Addon", addonId));
 
         if (addon.getApprovalStatus() != AddonApprovalStatus.PENDING) {
@@ -292,9 +260,9 @@ public class AdminServiceImpl implements AdminService {
         addon.setApprovedAt(LocalDateTime.now());
         DoctorAddon savedAddon = doctorAddonRepository.save(addon);
 
-        UserSubscription sub = addon.getUserSubscription();
-        sub.setAllowedDoctors(sub.getAllowedDoctors() + addon.getAdditionalDoctors());
-        userSubscriptionRepository.save(sub);
+        UserSubscription sub = userSubscriptionRepository.findByIdForUpdate(addon.getUserSubscription().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription", addon.getUserSubscription().getId()));
+        syncAllowedDoctorEntitlement(sub);
 
         updateEntityMaxDoctorLimit(sub.getUser(), sub.getAllowedDoctors());
 
@@ -305,7 +273,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public DoctorAddonResponse rejectDoctorAddon(Long addonId, UUID adminUserId) {
-        DoctorAddon addon = doctorAddonRepository.findById(addonId)
+        DoctorAddon addon = doctorAddonRepository.findByIdForUpdate(addonId)
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor Addon", addonId));
 
         if (addon.getApprovalStatus() != AddonApprovalStatus.PENDING) {
@@ -316,8 +284,8 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("Admin", adminUserId));
 
         addon.setApprovalStatus(AddonApprovalStatus.REJECTED);
-        addon.setApprovedBy(admin);
-        addon.setApprovedAt(LocalDateTime.now());
+        addon.setRejectedBy(admin);
+        addon.setRejectedAt(LocalDateTime.now());
         DoctorAddon savedAddon = doctorAddonRepository.save(addon);
 
         log.info("Doctor addon request rejected by admin {}", adminUserId);
@@ -338,7 +306,38 @@ public class AdminServiceImpl implements AdminService {
         if (addon.getApprovedBy() != null) {
             res.setApprovedByUserId(addon.getApprovedBy().getId());
         }
+        if (addon.getRejectedBy() != null) {
+            res.setRejectedByUserId(addon.getRejectedBy().getId());
+        }
+        UserSubscription subscription = addon.getUserSubscription();
+        res.setUserSubscriptionId(subscription.getId());
+        res.setEntityId(addon.getFacilityId());
+        res.setUsername(subscription.getUser().getFullName());
+        res.setUserEmail(subscription.getUser().getEmail());
+        mapAddonFacility(addon, res);
         return res;
+    }
+
+    private void mapAddonFacility(DoctorAddon addon, DoctorAddonResponse response) {
+        Long facilityId = addon.getFacilityId();
+        if (facilityId == null) return;
+        if (addon.getFacilityType() == FacilityType.HOSPITAL) {
+            hospitalRepository.findById(facilityId).ifPresent(hospital -> {
+                response.setEntityType(FacilityType.HOSPITAL.name());
+                response.setEntityName(hospital.getHospitalName());
+                response.setState(hospital.getState());
+                response.setCity(hospital.getCity());
+                response.setAddress(hospital.getAddressLine1());
+            });
+        } else if (addon.getFacilityType() == FacilityType.CLINIC) {
+            clinicRepository.findById(facilityId).ifPresent(clinic -> {
+                response.setEntityType(FacilityType.CLINIC.name());
+                response.setEntityName(clinic.getClinicName());
+                response.setState(clinic.getState());
+                response.setCity(clinic.getCity());
+                response.setAddress(clinic.getAddressLine1());
+            });
+        }
     }
 
     private String generateSecurePassword(int length) {
@@ -365,5 +364,15 @@ public class AdminServiceImpl implements AdminService {
                 clinicRepository.save(c);
             }
         }
+    }
+
+    private void syncAllowedDoctorEntitlement(UserSubscription subscription) {
+        int addonDoctors = doctorAddonRepository.findApprovedAndPaidBySubscriptionId(subscription.getId()).stream()
+                .filter(addon -> !addon.getEndDate().isBefore(LocalDate.now()))
+                .mapToInt(DoctorAddon::getAdditionalDoctors)
+                .sum();
+        subscription.setAllowedDoctors(
+                subscription.getSubscriptionPackage().getBaseDoctorLimit() + addonDoctors);
+        userSubscriptionRepository.save(subscription);
     }
 }

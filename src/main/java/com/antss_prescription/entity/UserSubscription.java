@@ -19,6 +19,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Version;
 import lombok.*;
 
 @Entity
@@ -29,6 +30,9 @@ import lombok.*;
 @AllArgsConstructor
 public class UserSubscription {
 
+    @Version
+    private Long version;
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -36,6 +40,9 @@ public class UserSubscription {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @Column(name = "active_owner_key", unique = true, length = 36)
+    private String activeOwnerKey;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "package_id", nullable = false)
@@ -53,8 +60,29 @@ public class UserSubscription {
     @Column(nullable = false)
     private Integer usedDoctors = 0;
 
-    @Column(nullable = true)
-    private Long entityId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cancelled_by")
+    private User cancelledBy;
+
+    private LocalDateTime cancelledAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "suspended_by")
+    private User suspendedBy;
+
+    private LocalDateTime suspendedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reactivated_by")
+    private User reactivatedBy;
+
+    private LocalDateTime reactivatedAt;
+
+    @Column(length = 255)
+    private String paymentTransactionRef;
+
+    @Column(length = 500)
+    private String paymentFailureReason;
 
     @Column(nullable = false)
     private Integer allowedHospitals = 1;
@@ -77,12 +105,31 @@ public class UserSubscription {
 
     @PrePersist
     protected void onCreate() {
+        normalizePaymentState();
+        syncActiveOwnerKey();
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate
     protected void onUpdate() {
+        normalizePaymentState();
+        syncActiveOwnerKey();
         updatedAt = LocalDateTime.now();
+    }
+
+    private void syncActiveOwnerKey() {
+        activeOwnerKey = user != null && user.getId() != null
+                && (subscriptionStatus == SubscriptionStatus.ACTIVE
+                    || subscriptionStatus == SubscriptionStatus.PENDING)
+                ? user.getId().toString()
+                : null;
+    }
+
+    private void normalizePaymentState() {
+        if (paymentStatus == PaymentStatus.PENDING
+                && subscriptionStatus == SubscriptionStatus.ACTIVE) {
+            subscriptionStatus = SubscriptionStatus.PENDING;
+        }
     }
 }

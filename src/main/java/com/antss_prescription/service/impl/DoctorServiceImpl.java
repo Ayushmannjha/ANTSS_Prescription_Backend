@@ -10,6 +10,7 @@ import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.repository.*;
 import com.antss_prescription.service.DoctorService;
 import com.antss_prescription.service.EmailService;
+import com.antss_prescription.security.PasswordResetTokenService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -40,6 +41,7 @@ public class DoctorServiceImpl implements DoctorService {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final ModelMapper modelMapper;
+    private final PasswordResetTokenService passwordResetTokenService;
 
     @Override
     public DoctorResponse addDoctor(CreateDoctorRequest request, UUID userId) {
@@ -94,8 +96,11 @@ public class DoctorServiceImpl implements DoctorService {
 
         UUID ownerId = owner.getId();
 
-        List<UserSubscription> activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(ownerId,
-                SubscriptionStatus.ACTIVE);
+        List<UserSubscription> activeSubs = userSubscriptionRepository.findValidByUserIdForUpdate(
+                ownerId, java.time.LocalDate.now());
+        if (activeSubs.isEmpty()) {
+            throw new BusinessException("An active paid subscription is required to add a doctor");
+        }
         int totalAllowedDoctors = activeSubs.stream().mapToInt(UserSubscription::getAllowedDoctors).sum();
 
         int activeDoctors = getActiveDoctorCountForUser(ownerId, owner.getUserType());
@@ -105,9 +110,7 @@ public class DoctorServiceImpl implements DoctorService {
                     + "). Please purchase doctor addons to add more doctors.");
         }
 
-        java.time.LocalDate subEndDate = activeSubs.isEmpty()
-                ? java.time.LocalDate.now().plusYears(1)
-                : activeSubs.get(0).getEndDate();
+        java.time.LocalDate subEndDate = activeSubs.get(0).getEndDate();
 
         String plainPassword = generateSecurePassword(12);
         User doctorUser = new User();
@@ -125,6 +128,7 @@ public class DoctorServiceImpl implements DoctorService {
         credential.setUsername(request.getEmail());
         credential.setPasswordHash(passwordEncoder.encode(plainPassword));
         loginCredentialRepository.save(credential);
+        String setupToken = passwordResetTokenService.issue(savedDoctorUser);
 
         Doctor doctor = new Doctor();
         doctor.setDoctorName(request.getDoctorName());
@@ -141,15 +145,12 @@ public class DoctorServiceImpl implements DoctorService {
 
         if (hospital != null) {
             doctor.setHospital(hospital);
-            hospital.setActiveDoctorCount(hospital.getActiveDoctorCount() + 1);
-            hospitalRepository.save(hospital);
         } else {
             doctor.setClinic(clinic);
-            clinic.setActiveDoctorCount(clinic.getActiveDoctorCount() + 1);
-            clinicRepository.save(clinic);
         }
 
         Doctor savedDoctor = doctorRepository.save(doctor);
+        syncActiveDoctorCount(savedDoctor);
 
         allocateDoctorToSubscription(savedDoctor, activeSubs);
 
@@ -157,7 +158,7 @@ public class DoctorServiceImpl implements DoctorService {
                 request.getEmail(),
                 request.getDoctorName(),
                 request.getEmail(),
-                plainPassword,
+                setupToken,
                 "Doctor",
                 subEndDate);
 
@@ -201,7 +202,13 @@ public class DoctorServiceImpl implements DoctorService {
     public DoctorResponse updateDoctor(UUID id, UpdateDoctorRequest request, UUID userId) {
         Doctor doctor = getDoctorAndVerifyAccess(id, userId);
 
+        if (doctor.getUser() != null && !doctor.getUser().getEmail().equalsIgnoreCase(request.getEmail())
+                && userRepository.existsByEmail(request.getEmail())) {
+            throw new BusinessException("Email already registered: " + request.getEmail());
+        }
+
         EntityStatus oldStatus = doctor.getStatus();
+        String oldEmail = doctor.getEmail();
         doctor.setDoctorName(request.getDoctorName());
         doctor.setSpecialization(request.getSpecialization());
         doctor.setQualification(request.getQualification());
@@ -214,6 +221,8 @@ public class DoctorServiceImpl implements DoctorService {
         doctor.setStatus(newStatus);
         Doctor saved = doctorRepository.save(doctor);
 
+        syncDoctorIdentity(doctor, request, oldEmail);
+
         if (oldStatus == EntityStatus.ACTIVE && newStatus == EntityStatus.INACTIVE) {
             deallocateDoctor(doctor);
             decrementActiveDoctorCount(doctor);
@@ -223,12 +232,12 @@ public class DoctorServiceImpl implements DoctorService {
                     : doctor.getClinic().getOwner();
             UUID ownerId = (owner != null) ? owner.getId() : userId;
             UserType ownerType = (owner != null) ? owner.getUserType() : UserType.HOSPITAL;
-            List<UserSubscription> activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(ownerId,
-                    SubscriptionStatus.ACTIVE);
+            List<UserSubscription> activeSubs = userSubscriptionRepository.findValidByUserIdForUpdate(
+                    ownerId, java.time.LocalDate.now());
             int totalAllowedDoctors = activeSubs.stream().mapToInt(UserSubscription::getAllowedDoctors).sum();
             int activeDoctors = getActiveDoctorCountForUser(ownerId, ownerType);
 
-            if (activeDoctors >= totalAllowedDoctors) {
+            if (activeDoctors > totalAllowedDoctors) {
                 doctor.setStatus(EntityStatus.INACTIVE);
                 doctorRepository.save(doctor);
                 throw new BusinessException(
@@ -249,10 +258,10 @@ public class DoctorServiceImpl implements DoctorService {
         Doctor doctor = getDoctorAndVerifyAccess(id, userId);
         if (doctor.getStatus() == EntityStatus.ACTIVE) {
             deallocateDoctor(doctor);
-            decrementActiveDoctorCount(doctor);
         }
         doctor.setStatus(EntityStatus.INACTIVE);
         doctorRepository.save(doctor);
+        syncActiveDoctorCount(doctor);
         setLinkedLoginState(doctor, false);
         log.info("Doctor deleted (marked inactive): {}", doctor.getDoctorName());
     }
@@ -312,27 +321,31 @@ public class DoctorServiceImpl implements DoctorService {
     private int getActiveDoctorCountForUser(UUID userId, UserType type) {
         if (type == UserType.HOSPITAL) {
             List<Hospital> hospitals = hospitalRepository.findByUserIdOrOwnerId(userId, userId);
-            return hospitals.stream().mapToInt(Hospital::getActiveDoctorCount).sum();
+            return Math.toIntExact(hospitals.stream()
+                    .mapToLong(h -> doctorRepository.countByHospitalAndStatus(h, EntityStatus.ACTIVE)).sum());
         } else {
             List<Clinic> clinics = clinicRepository.findByUserIdOrOwnerId(userId, userId);
-            return clinics.stream().mapToInt(Clinic::getActiveDoctorCount).sum();
+            return Math.toIntExact(clinics.stream()
+                    .mapToLong(c -> doctorRepository.countByClinicAndStatus(c, EntityStatus.ACTIVE)).sum());
         }
     }
 
     private void allocateDoctorToSubscription(Doctor doctor, List<UserSubscription> activeSubs) {
         for (UserSubscription sub : activeSubs) {
-            if (sub.getUsedDoctors() < sub.getAllowedDoctors()) {
-                sub.setUsedDoctors(sub.getUsedDoctors() + 1);
-                userSubscriptionRepository.save(sub);
+            int usedDoctors = Math.toIntExact(allocationRepository
+                    .countByUserSubscriptionIdAndStatus(sub.getId(), AllocationStatus.ACTIVE));
+            if (usedDoctors < sub.getAllowedDoctors()) {
 
                 SubscriptionDoctorAllocation allocation = new SubscriptionDoctorAllocation();
                 allocation.setUserSubscription(sub);
                 allocation.setDoctor(doctor);
                 allocation.setAllocationType(
-                        sub.getUsedDoctors() <= sub.getSubscriptionPackage().getBaseDoctorLimit() ? AllocationType.BASE
+                        usedDoctors < sub.getSubscriptionPackage().getBaseDoctorLimit() ? AllocationType.BASE
                                 : AllocationType.ADDON);
                 allocation.setStatus(AllocationStatus.ACTIVE);
                 allocationRepository.save(allocation);
+                sub.setUsedDoctors(usedDoctors + 1);
+                userSubscriptionRepository.save(sub);
                 return;
             }
         }
@@ -347,37 +360,31 @@ public class DoctorServiceImpl implements DoctorService {
             allocationRepository.save(alloc);
 
             UserSubscription sub = alloc.getUserSubscription();
-            if (sub.getUsedDoctors() > 0) {
-                sub.setUsedDoctors(sub.getUsedDoctors() - 1);
-                userSubscriptionRepository.save(sub);
-            }
+            int activeAllocations = Math.toIntExact(allocationRepository
+                    .countByUserSubscriptionIdAndStatus(sub.getId(), AllocationStatus.ACTIVE));
+            sub.setUsedDoctors(activeAllocations);
+            userSubscriptionRepository.save(sub);
         }
     }
 
     private void decrementActiveDoctorCount(Doctor doctor) {
-        if (doctor.getHospital() != null) {
-            Hospital h = doctor.getHospital();
-            if (h.getActiveDoctorCount() > 0) {
-                h.setActiveDoctorCount(h.getActiveDoctorCount() - 1);
-                hospitalRepository.save(h);
-            }
-        } else if (doctor.getClinic() != null) {
-            Clinic c = doctor.getClinic();
-            if (c.getActiveDoctorCount() > 0) {
-                c.setActiveDoctorCount(c.getActiveDoctorCount() - 1);
-                clinicRepository.save(c);
-            }
-        }
+        syncActiveDoctorCount(doctor);
     }
 
     private void incrementActiveDoctorCount(Doctor doctor) {
+        syncActiveDoctorCount(doctor);
+    }
+
+    private void syncActiveDoctorCount(Doctor doctor) {
         if (doctor.getHospital() != null) {
             Hospital h = doctor.getHospital();
-            h.setActiveDoctorCount(h.getActiveDoctorCount() + 1);
+            h.setActiveDoctorCount(Math.toIntExact(
+                    doctorRepository.countByHospitalAndStatus(h, EntityStatus.ACTIVE)));
             hospitalRepository.save(h);
         } else if (doctor.getClinic() != null) {
             Clinic c = doctor.getClinic();
-            c.setActiveDoctorCount(c.getActiveDoctorCount() + 1);
+            c.setActiveDoctorCount(Math.toIntExact(
+                    doctorRepository.countByClinicAndStatus(c, EntityStatus.ACTIVE)));
             clinicRepository.save(c);
         }
     }
@@ -392,6 +399,22 @@ public class DoctorServiceImpl implements DoctorService {
             loginCredentialRepository.save(credential);
         });
         if (!active) loginSessionRepository.expireAllSessionsForUser(linkedUser);
+    }
+
+    private void syncDoctorIdentity(Doctor doctor, UpdateDoctorRequest request, String oldEmail) {
+        if (doctor.getUser() == null) return;
+        User linkedUser = doctor.getUser();
+        linkedUser.setFullName(request.getDoctorName());
+        linkedUser.setEmail(request.getEmail());
+        linkedUser.setMobileNumber(request.getMobileNumber());
+        userRepository.save(linkedUser);
+        loginCredentialRepository.findByUserId(linkedUser.getId()).ifPresent(credential -> {
+            credential.setUsername(request.getEmail());
+            loginCredentialRepository.save(credential);
+        });
+        if (oldEmail != null && !oldEmail.equalsIgnoreCase(request.getEmail())) {
+            loginSessionRepository.expireAllSessionsForUser(linkedUser);
+        }
     }
 
     private DoctorResponse mapToResponse(Doctor doctor) {

@@ -49,6 +49,8 @@ import com.antss_prescription.repository.UserSubscriptionRepository;
 import com.antss_prescription.security.ApprovalTokenUtils;
 import com.antss_prescription.security.JwtTokenProvider;
 import com.antss_prescription.security.AccessControlService;
+import com.antss_prescription.security.TokenHashService;
+import com.antss_prescription.security.PasswordResetTokenService;
 import com.antss_prescription.enums.LoginStatus;
 import com.antss_prescription.service.AuthService;
 import com.antss_prescription.service.EmailService;
@@ -74,6 +76,8 @@ public class AuthServiceImpl implements AuthService {
     private final DoctorRepository doctorRepository;
     private final RmoRepository rmoRepository;
     private final AccessControlService accessControl;
+    private final TokenHashService tokenHashService;
+    private final PasswordResetTokenService passwordResetTokenService;
 
     @Value("${app.admin.email}")
     private String adminEmail;
@@ -87,8 +91,6 @@ public class AuthServiceImpl implements AuthService {
 
   @Override
 public void register(RegisterRequest request) {
-
-    try {
 
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BusinessException("Email already registered: " + request.getEmail());
@@ -150,7 +152,7 @@ public void register(RegisterRequest request) {
 
         sub.setUsedDoctors(0);
         sub.setPaymentStatus(PaymentStatus.PENDING);
-        sub.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+        sub.setSubscriptionStatus(SubscriptionStatus.PENDING);
 
         userSubscriptionRepository.save(sub);
 
@@ -233,21 +235,6 @@ public void register(RegisterRequest request) {
                 approvalUrl
         );
 
-    } catch (Exception e) {
-
-        log.error("Registration failed", e);
-
-        Throwable root = e;
-        while (root.getCause() != null) {
-            root = root.getCause();
-        }
-
-        log.error("ROOT CAUSE => {}", root.getMessage());
-
-        throw new BusinessException(
-                "Registration failed: " + root.getMessage()
-        );
-    }
 }
 
     @Override
@@ -311,8 +298,8 @@ public void register(RegisterRequest request) {
 
         LoginSession session = new LoginSession();
         session.setUser(user);
-        session.setToken(accessToken);
-        session.setRefreshToken(refreshToken);
+        session.setToken(tokenHashService.hash(accessToken));
+        session.setRefreshToken(tokenHashService.hash(refreshToken));
         session.setDeviceInfo(request.getDeviceInfo());
         loginSessionRepository.save(session);
 
@@ -322,7 +309,7 @@ public void register(RegisterRequest request) {
 
     @Override
     public void logout(String token) {
-        LoginSession session = loginSessionRepository.findByTokenAndExpiredFalse(token)
+        LoginSession session = loginSessionRepository.findByTokenAndExpiredFalse(tokenHashService.hash(token))
                 .orElseThrow(() -> new UnauthorizedException("Invalid or already expired session"));
         session.setExpired(true);
         loginSessionRepository.save(session);
@@ -331,16 +318,11 @@ public void register(RegisterRequest request) {
 
     @Override
     public void forgotPassword(ForgotPasswordRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("No account found with email: " + request.getEmail()));
-
-        String token = UUID.randomUUID().toString();
-        user.setPasswordResetToken(token);
-        user.setPasswordResetExpiry(LocalDateTime.now().plusHours(1));
-        userRepository.save(user);
-
-        emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), token);
-        log.info("Password reset email sent to: {}", user.getEmail());
+        userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
+            String token = passwordResetTokenService.issue(user);
+            emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), token);
+            log.info("Password reset email sent to: {}", user.getEmail());
+        });
     }
 
     @Override
@@ -349,7 +331,7 @@ public void register(RegisterRequest request) {
             throw new BusinessException("Passwords do not match");
         }
 
-        User user = userRepository.findByPasswordResetToken(request.getToken())
+        User user = userRepository.findByPasswordResetToken(tokenHashService.hash(request.getToken()))
                 .orElseThrow(() -> new BusinessException("Invalid or expired password reset token"));
 
         LoginCredential credential = loginCredentialRepository.findByUserId(user.getId()).orElseThrow(
@@ -377,18 +359,14 @@ public void register(RegisterRequest request) {
 
     @Override
     public AuthResponse refreshToken(RefreshTokenRequest request) {
-        LoginSession session = loginSessionRepository.findByRefreshTokenAndExpiredFalse(request.getRefreshToken())
+        LoginSession session = loginSessionRepository.findByRefreshTokenAndExpiredFalse(
+                        tokenHashService.hash(request.getRefreshToken()))
                 .orElseThrow(() -> new UnauthorizedException("Invalid or expired refresh token"));
 
-        if (!jwtTokenProvider.validateToken(request.getRefreshToken())) {
+        if (!jwtTokenProvider.validateToken(request.getRefreshToken(), "refresh")) {
             session.setExpired(true);
             loginSessionRepository.save(session);
             throw new UnauthorizedException("Refresh token has expired");
-        }
-
-        if (!"refresh".equals(jwtTokenProvider.getTokenType(request.getRefreshToken()))) {
-            expireSession(session);
-            throw new UnauthorizedException("Invalid refresh token type");
         }
 
         User user = session.getUser();
@@ -401,11 +379,13 @@ public void register(RegisterRequest request) {
             throw new UnauthorizedException("Account or subscription is no longer active");
         }
         String newAccessToken = jwtTokenProvider.generateAccessToken(user.getEmail());
+        String newRefreshToken = jwtTokenProvider.generateRefreshToken(user.getEmail());
 
-        session.setToken(newAccessToken);
+        session.setToken(tokenHashService.hash(newAccessToken));
+        session.setRefreshToken(tokenHashService.hash(newRefreshToken));
         loginSessionRepository.save(session);
 
-        return new AuthResponse(newAccessToken, request.getRefreshToken(), mapToUserResponse(user));
+        return new AuthResponse(newAccessToken, newRefreshToken, mapToUserResponse(user));
     }
 
     private boolean hasValidSubscriptionFor(User user) {

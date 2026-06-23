@@ -28,6 +28,8 @@ import com.antss_prescription.repository.prescription.GeneralExaminationRepo;
 import com.antss_prescription.repository.prescription.PastMedicalHistoryRepo;
 import com.antss_prescription.repository.prescription.VitalsRepo;
 import com.antss_prescription.repository.prescription.PatientRegistrationRepo;
+import com.antss_prescription.repository.prescription.PrescriptionRepo;
+import com.antss_prescription.exception.ConflictException;
 import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.service.ConsultationService;
 
@@ -46,6 +48,7 @@ public class ConsultationServiceImpl implements ConsultationService {
     private final VitalsRepo vitalsRepository;
     private final PatientRegistrationRepo registrationRepository;
     private final AccessControlService accessControl;
+    private final PrescriptionRepo prescriptionRepository;
 
 
     @Override
@@ -118,13 +121,11 @@ public class ConsultationServiceImpl implements ConsultationService {
     // ─────────────────────────────────────────────
     @Override
     public List<ConsultationResponse> getAllConsultations() {
-        List<ConsultationResponse> responses = new ArrayList<>();
-        var user = accessControl.currentUser();
-        for (Consultation c : consultationRepo.findAll()) {
-            if (!accessControl.canAccess(c, user)) continue;
-            responses.add(mapToResponse(c));
-        }
-        return responses;
+        var scope = accessControl.currentClinicalScope();
+        List<Consultation> consultations = scope.admin()
+                ? consultationRepo.findAll()
+                : consultationRepo.findAccessible(scope.hospitalIds(), scope.clinicIds());
+        return consultations.stream().map(this::mapToResponse).toList();
     }
 
     @Override
@@ -231,6 +232,9 @@ public class ConsultationServiceImpl implements ConsultationService {
                 .orElseThrow(() -> new RuntimeException(
                         "Consultation not found with id : " + consultationId));
         accessControl.requireConsultationAccess(consultation);
+        if (prescriptionRepository.existsByConsultation(consultation)) {
+            throw new ConflictException("Consultation cannot be deleted while prescriptions exist");
+        }
         consultationRepo.delete(consultation);
     }
 

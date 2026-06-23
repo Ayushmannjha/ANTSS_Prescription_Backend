@@ -24,6 +24,9 @@ public class Document {
 
     private String fileName;
     private String url;
+    private String documentType;
+    private String cloudinaryPublicId;
+    private String cloudinaryResourceType;
 
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)

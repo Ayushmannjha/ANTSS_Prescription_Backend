@@ -27,10 +27,11 @@ public class CreateDoctorRequest {
     @Size(max = 254)
     private String email;
 
-    @Pattern(regexp = "^$|^[6-9][0-9]{9}$", message = "must be a valid 10-digit mobile number")
+    @NotBlank
+    @Pattern(regexp = "^[6-9][0-9]{9}$", message = "must be a valid 10-digit mobile number")
     private String mobileNumber;
 
-    //@NotBlank
+    @NotBlank
     @Size(max = 100)
     private String registrationNumber;
 
@@ -41,4 +42,9 @@ public class CreateDoctorRequest {
     private Long hospitalId;
     @Positive
     private Long clinicId;
+
+    @AssertTrue(message = "hospitalId and clinicId cannot both be provided")
+    public boolean isFacilitySelectionValid() {
+        return hospitalId == null || clinicId == null;
+    }
 }

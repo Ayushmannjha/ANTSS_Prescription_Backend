@@ -2,6 +2,7 @@ package com.antss_prescription.entity;
 
 import com.antss_prescription.enums.AddonApprovalStatus;
 import com.antss_prescription.enums.PaymentStatus;
+import com.antss_prescription.enums.FacilityType;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -12,6 +13,9 @@ import java.time.LocalDateTime;
 @Data
 public class DoctorAddon {
 
+    @Version
+    private Long version;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -19,6 +23,11 @@ public class DoctorAddon {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_subscription_id", nullable = false)
     private UserSubscription userSubscription;
+
+    private Long facilityId;
+
+    @Enumerated(EnumType.STRING)
+    private FacilityType facilityType;
 
     @Column(nullable = false)
     private Integer additionalDoctors;
@@ -51,6 +60,18 @@ public class DoctorAddon {
     private User approvedBy;
 
     private LocalDateTime approvedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rejected_by")
+    private User rejectedBy;
+
+    private LocalDateTime rejectedAt;
+
+    @Column(length = 500)
+    private String rejectionReason;
+
+    @Column(length = 255)
+    private String paymentTransactionRef;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

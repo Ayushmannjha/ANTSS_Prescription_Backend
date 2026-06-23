@@ -28,6 +28,7 @@ import com.antss_prescription.enums.AddonApprovalStatus;
 import com.antss_prescription.enums.AllocationStatus;
 import com.antss_prescription.enums.AllocationType;
 import com.antss_prescription.enums.DurationType;
+import com.antss_prescription.enums.FacilityType;
 import com.antss_prescription.enums.PaymentStatus;
 import com.antss_prescription.enums.SubscriptionStatus;
 import com.antss_prescription.repository.ClinicRepository;
@@ -56,6 +57,7 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
     private final ClinicRepository                     clinicRepository;
     private final PackageRepository                    packageRepository;
     private final DoctorRepository                     doctorRepository;
+    private final LinkedAccountStatusService            linkedAccountStatusService;
  
     // ──────────────────────────────────────────────────────────────────────
     // PUBLIC API
@@ -107,10 +109,11 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
         // ── Allocations ──────────────────────────────────────────────────
         List<SubscriptionDoctorAllocation> allocations =
                 allocationRepository.findActiveBySubscriptionId(subscription.getId());
+        int usedDoctors = allocations.size();
  
         // ── Facilities ───────────────────────────────────────────────────
-        List<Hospital> hospitals = hospitalRepository.findByOwnerUser(user);
-        List<Clinic>   clinics   = clinicRepository.findByOwnerUser(user);
+        List<Hospital> hospitals = hospitalRepository.findByOwner(user);
+        List<Clinic>   clinics   = clinicRepository.findByOwner(user);
  
         // ── Time calculations ────────────────────────────────────────────
         LocalDate today = LocalDate.now();
@@ -135,8 +138,8 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
                 // doctor quota
                 .baseDoctorLimit(pkg.getBaseDoctorLimit())
                 .allowedDoctors(effectiveAllowed)
-                .usedDoctors(subscription.getUsedDoctors())
-                .availableDoctorSlots(effectiveAllowed - subscription.getUsedDoctors())
+                .usedDoctors(usedDoctors)
+                .availableDoctorSlots(Math.max(0, effectiveAllowed - usedDoctors))
                 // facility quota
                 .allowedHospitals(subscription.getAllowedHospitals())
                 .allowedClinics(subscription.getAllowedClinics())
@@ -181,7 +184,9 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
                             .mapToInt(DoctorAddon::getAdditionalDoctors)
                             .sum();
                     int ceiling = pkg.getBaseDoctorLimit() + addonDoctors;
-                    return Math.max(0, ceiling - sub.getUsedDoctors());
+                    int activeAllocations = Math.toIntExact(allocationRepository
+                            .countByUserSubscriptionIdAndStatus(sub.getId(), AllocationStatus.ACTIVE));
+                    return Math.max(0, ceiling - activeAllocations);
                 })
                 .orElse(0);
     }
@@ -203,6 +208,10 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
                         .approvedAt(a.getApprovedAt())
                         .approvedByName(a.getApprovedBy() != null
                                 ? a.getApprovedBy().getFullName() : null)
+                        .facilityId(a.getFacilityId())
+                        .facilityType(a.getFacilityType() != null ? a.getFacilityType().name() : null)
+                        .rejectionReason(a.getRejectionReason())
+                        .paymentTransactionRef(a.getPaymentTransactionRef())
                         .build())
                 .collect(Collectors.toList());
     }
@@ -348,40 +357,33 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 	@Override
 	public int getUsedDoctorCount(UUID userId) {
 		return subscriptionRepository.findActiveByUserId(userId)
-				.map(UserSubscription::getUsedDoctors)
+				.map(sub -> Math.toIntExact(allocationRepository
+						.countByUserSubscriptionIdAndStatus(sub.getId(), AllocationStatus.ACTIVE)))
 				.orElse(0);
 	}
 
 	@Override
 	@Transactional
 	public void incrementUsedDoctors(UUID userId) {
-		UserSubscription sub = subscriptionRepository.findActiveByUserId(userId)
-				.orElseThrow(() -> new NoActiveSubscriptionException(userId));
-		int allowed = getEffectiveAllowedDoctors(userId);
-		if (sub.getUsedDoctors() >= allowed) {
-			throw new DoctorQuotaExceededException(userId);
-		}
-		sub.setUsedDoctors(sub.getUsedDoctors() + 1);
-		subscriptionRepository.save(sub);
+		syncUsedDoctorCount(userId);
 	}
 
 	@Override
 	@Transactional
 	public void decrementUsedDoctors(UUID userId) {
-		UserSubscription sub = subscriptionRepository.findActiveByUserId(userId)
-				.orElseThrow(() -> new NoActiveSubscriptionException(userId));
-		int current = sub.getUsedDoctors();
-		sub.setUsedDoctors(Math.max(0, current - 1));
-		subscriptionRepository.save(sub);
+		syncUsedDoctorCount(userId);
 	}
 
 	@Override
 	@Transactional
 	public UUID createSubscription(UUID userId, Long packageId) {
-		User user = userRepository.findById(userId)
+		User user = userRepository.findByIdForUpdate(userId)
 				.orElseThrow(() -> new UserNotFoundException(userId));
 		
-		if (subscriptionRepository.findActiveByUserId(userId).isPresent()) {
+		boolean hasCurrentSubscription = subscriptionRepository.findByUserIdForUpdate(userId).stream()
+				.anyMatch(sub -> sub.getSubscriptionStatus() == SubscriptionStatus.ACTIVE
+						|| sub.getSubscriptionStatus() == SubscriptionStatus.PENDING);
+		if (hasCurrentSubscription) {
 			throw new DuplicateSubscriptionException(userId);
 		}
 		
@@ -411,7 +413,7 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 		sub.setAllowedHospitals(1);
 		sub.setAllowedClinics(1);
 		sub.setPaymentStatus(PaymentStatus.PENDING);
-		sub.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+		sub.setSubscriptionStatus(SubscriptionStatus.PENDING);
 		
 		UserSubscription saved = subscriptionRepository.save(sub);
 		return saved.getId();
@@ -420,7 +422,7 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 	@Override
 	@Transactional
 	public UserSubscriptionSummaryDto renewSubscription(UUID subscriptionId) {
-		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+		UserSubscription sub = subscriptionRepository.findByIdForUpdate(subscriptionId)
 				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
 		
 		SubscriptionPackage pkg = sub.getSubscriptionPackage();
@@ -437,7 +439,7 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 		
 		sub.setEndDate(newEndDate);
 		sub.setPaymentStatus(PaymentStatus.PENDING);
-		sub.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+		sub.setSubscriptionStatus(SubscriptionStatus.PENDING);
 		
 		UserSubscription saved = subscriptionRepository.save(sub);
 		return mapSubscriptionToSummary(saved, saved.getUser());
@@ -446,8 +448,10 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 	@Override
 	@Transactional
 	public UserSubscriptionSummaryDto upgradeSubscription(UUID userId, Long newPackageId) {
-		UserSubscription sub = subscriptionRepository.findActiveByUserId(userId)
-				.orElseThrow(() -> new NoActiveSubscriptionException(userId));
+		userRepository.findByIdForUpdate(userId)
+				.orElseThrow(() -> new UserNotFoundException(userId));
+		UserSubscription sub = subscriptionRepository.findValidByUserIdForUpdate(userId, LocalDate.now())
+				.stream().findFirst().orElseThrow(() -> new NoActiveSubscriptionException(userId));
 		
 		SubscriptionPackage newPkg = packageRepository.findById(newPackageId)
 				.orElseThrow(() -> new PackageNotFoundException(newPackageId));
@@ -472,8 +476,15 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 		int addonDoctors = activeAddons.stream()
 				.mapToInt(DoctorAddon::getAdditionalDoctors)
 				.sum();
-		sub.setAllowedDoctors(newPkg.getBaseDoctorLimit() + addonDoctors);
+		int newAllowedDoctors = newPkg.getBaseDoctorLimit() + addonDoctors;
+		int activeAllocations = Math.toIntExact(allocationRepository
+				.countByUserSubscriptionIdAndStatus(sub.getId(), AllocationStatus.ACTIVE));
+		if (newAllowedDoctors < activeAllocations) {
+			throw new RuntimeException("Package allows fewer doctors than are currently allocated");
+		}
+		sub.setAllowedDoctors(newAllowedDoctors);
 		sub.setPaymentStatus(PaymentStatus.PENDING);
+		sub.setSubscriptionStatus(SubscriptionStatus.PENDING);
 		
 		UserSubscription saved = subscriptionRepository.save(sub);
 		return mapSubscriptionToSummary(saved, saved.getUser());
@@ -482,34 +493,44 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 	@Override
 	@Transactional
 	public void cancelSubscription(UUID userId, UUID cancelledBy) {
-		UserSubscription sub = subscriptionRepository.findActiveByUserId(userId)
-				.orElseThrow(() -> new NoActiveSubscriptionException(userId));
+		UserSubscription sub = subscriptionRepository.findValidByUserIdForUpdate(userId, LocalDate.now())
+				.stream().findFirst().orElseThrow(() -> new NoActiveSubscriptionException(userId));
 		sub.setSubscriptionStatus(SubscriptionStatus.CANCELLED);
+		sub.setCancelledBy(userRepository.findById(cancelledBy)
+				.orElseThrow(() -> new UserNotFoundException(cancelledBy)));
+		sub.setCancelledAt(LocalDateTime.now());
 		subscriptionRepository.save(sub);
 	}
 
 	@Override
 	@Transactional
 	public void suspendSubscription(UUID subscriptionId, UUID suspendedBy) {
-		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+		UserSubscription sub = subscriptionRepository.findByIdForUpdate(subscriptionId)
 				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
 		sub.setSubscriptionStatus(SubscriptionStatus.SUSPENDED);
+		sub.setSuspendedBy(userRepository.findById(suspendedBy)
+				.orElseThrow(() -> new UserNotFoundException(suspendedBy)));
+		sub.setSuspendedAt(LocalDateTime.now());
 		subscriptionRepository.save(sub);
 	}
 
 	@Override
 	@Transactional
 	public void reactivateSubscription(UUID subscriptionId, UUID reactivatedBy) {
-		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+		UserSubscription sub = subscriptionRepository.findByIdForUpdate(subscriptionId)
 				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
 		sub.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+		sub.setReactivatedBy(userRepository.findById(reactivatedBy)
+				.orElseThrow(() -> new UserNotFoundException(reactivatedBy)));
+		sub.setReactivatedAt(LocalDateTime.now());
 		subscriptionRepository.save(sub);
+		linkedAccountStatusService.reactivateOwnerAndSubscriptionExpiredAccounts(sub.getUser());
 	}
 
 	@Override
 	@Transactional
 	public void expireSubscription(UUID subscriptionId) {
-		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+		UserSubscription sub = subscriptionRepository.findByIdForUpdate(subscriptionId)
 				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
 		sub.setSubscriptionStatus(SubscriptionStatus.EXPIRED);
 		subscriptionRepository.save(sub);
@@ -533,29 +554,35 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 	@Override
 	@Transactional
 	public void markPaymentPaid(UUID subscriptionId, String transactionRef) {
-		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+		UserSubscription sub = subscriptionRepository.findByIdForUpdate(subscriptionId)
 				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
 		sub.setPaymentStatus(PaymentStatus.PAID);
-		if (sub.getSubscriptionStatus() == SubscriptionStatus.SUSPENDED) {
+		sub.setPaymentTransactionRef(transactionRef);
+		sub.setPaymentFailureReason(null);
+		if (sub.getSubscriptionStatus() == SubscriptionStatus.SUSPENDED
+				|| sub.getSubscriptionStatus() == SubscriptionStatus.PENDING) {
 			sub.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
 		}
 		subscriptionRepository.save(sub);
+		linkedAccountStatusService.reactivateOwnerAndSubscriptionExpiredAccounts(sub.getUser());
 	}
 
 	@Override
 	@Transactional
 	public void markPaymentFailed(UUID subscriptionId, String reason) {
-		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+		UserSubscription sub = subscriptionRepository.findByIdForUpdate(subscriptionId)
 				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
 		sub.setPaymentStatus(PaymentStatus.FAILED);
 		sub.setSubscriptionStatus(SubscriptionStatus.SUSPENDED);
+		sub.setPaymentFailureReason(reason);
 		subscriptionRepository.save(sub);
 	}
 
 	@Override
 	@Transactional
-	public Long requestDoctorAddon(UUID subscriptionId, int additionalDoctors) {
-		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+	public Long requestDoctorAddon(UUID subscriptionId, int additionalDoctors,
+			Long facilityId, FacilityType facilityType) {
+		UserSubscription sub = subscriptionRepository.findByIdForUpdate(subscriptionId)
 				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
 		
 		if (sub.getSubscriptionStatus() != SubscriptionStatus.ACTIVE) {
@@ -587,6 +614,7 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 		addon.setEndDate(sub.getEndDate());
 		addon.setPaymentStatus(PaymentStatus.PENDING);
 		addon.setApprovalStatus(AddonApprovalStatus.PENDING);
+		validateAndSetFacility(addon, sub, facilityId, facilityType);
 
 		DoctorAddon saved = addonRepository.save(addon);
 		return saved.getId();
@@ -595,8 +623,11 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 	@Override
 	@Transactional
 	public void approveDoctorAddon(Long addonId, UUID approvedBy) {
-		DoctorAddon addon = addonRepository.findById(addonId)
+		DoctorAddon addon = addonRepository.findByIdForUpdate(addonId)
 				.orElseThrow(() -> new RuntimeException("Doctor addon not found: " + addonId));
+		if (addon.getApprovalStatus() != AddonApprovalStatus.PENDING) {
+			throw new RuntimeException("Doctor addon has already been processed");
+		}
 		User admin = userRepository.findById(approvedBy)
 				.orElseThrow(() -> new UserNotFoundException(approvedBy));
 		
@@ -604,29 +635,38 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 		addon.setApprovedBy(admin);
 		addon.setApprovedAt(LocalDateTime.now());
 		addonRepository.save(addon);
+		syncAllowedDoctorEntitlement(addon.getUserSubscription().getId());
 	}
 
 	@Override
 	@Transactional
 	public void rejectDoctorAddon(Long addonId, UUID rejectedBy, String reason) {
-		DoctorAddon addon = addonRepository.findById(addonId)
+		DoctorAddon addon = addonRepository.findByIdForUpdate(addonId)
 				.orElseThrow(() -> new RuntimeException("Doctor addon not found: " + addonId));
+		if (addon.getApprovalStatus() != AddonApprovalStatus.PENDING) {
+			throw new RuntimeException("Doctor addon has already been processed");
+		}
 		addon.setApprovalStatus(AddonApprovalStatus.REJECTED);
+		User rejectingUser = userRepository.findById(rejectedBy)
+				.orElseThrow(() -> new UserNotFoundException(rejectedBy));
+		addon.setRejectedBy(rejectingUser);
+		addon.setRejectedAt(LocalDateTime.now());
+		addon.setRejectionReason(reason);
 		addonRepository.save(addon);
 	}
 
 	@Override
 	@Transactional
 	public void markAddonPaymentPaid(Long addonId, String transactionRef) {
-		DoctorAddon addon = addonRepository.findById(addonId)
+		DoctorAddon addon = addonRepository.findByIdForUpdate(addonId)
 				.orElseThrow(() -> new RuntimeException("Doctor addon not found: " + addonId));
+		if (addon.getPaymentStatus() == PaymentStatus.PAID) {
+			return;
+		}
 		addon.setPaymentStatus(PaymentStatus.PAID);
+		addon.setPaymentTransactionRef(transactionRef);
 		addonRepository.save(addon);
-		
-		UserSubscription sub = addon.getUserSubscription();
-		int currentAllowed = sub.getAllowedDoctors();
-		sub.setAllowedDoctors(currentAllowed + addon.getAdditionalDoctors());
-		subscriptionRepository.save(sub);
+		syncAllowedDoctorEntitlement(addon.getUserSubscription().getId());
 	}
 
 	@Override
@@ -648,11 +688,14 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 	@Override
 	@Transactional
 	public void allocateDoctor(UUID subscriptionId, UUID doctorId, String allocationType) {
-		UserSubscription sub = subscriptionRepository.findById(subscriptionId)
+		UserSubscription sub = subscriptionRepository.findByIdForUpdate(subscriptionId)
 				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
 		
 		Doctor doctor = doctorRepository.findById(doctorId)
 				.orElseThrow(() -> new RuntimeException("Doctor not found: " + doctorId));
+		if (!doctorBelongsToOwner(doctor, sub.getUser())) {
+			throw new RuntimeException("Doctor does not belong to the subscription owner");
+		}
 		
 		Optional<SubscriptionDoctorAllocation> existing = allocationRepository
 				.findByUserSubscriptionIdAndDoctorIdAndStatus(subscriptionId, doctorId, AllocationStatus.ACTIVE);
@@ -661,7 +704,9 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 		}
 		
 		int allowed = getEffectiveAllowedDoctors(sub.getUser().getId());
-		if (sub.getUsedDoctors() >= allowed) {
+		int activeAllocations = Math.toIntExact(allocationRepository
+				.countByUserSubscriptionIdAndStatus(subscriptionId, AllocationStatus.ACTIVE));
+		if (activeAllocations >= allowed) {
 			throw new DoctorQuotaExceededException(sub.getUser().getId());
 		}
 		
@@ -673,13 +718,15 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 		
 		allocationRepository.save(allocation);
 		
-		sub.setUsedDoctors(sub.getUsedDoctors() + 1);
+		sub.setUsedDoctors(activeAllocations + 1);
 		subscriptionRepository.save(sub);
 	}
 
 	@Override
 	@Transactional
 	public void deallocateDoctor(UUID subscriptionId, UUID doctorId) {
+		UserSubscription lockedSubscription = subscriptionRepository.findByIdForUpdate(subscriptionId)
+				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
 		SubscriptionDoctorAllocation allocation = allocationRepository
 				.findByUserSubscriptionIdAndDoctorIdAndStatus(subscriptionId, doctorId, AllocationStatus.ACTIVE)
 				.orElseThrow(() -> new RuntimeException("Active allocation not found for doctor: " + doctorId + " under subscription: " + subscriptionId));
@@ -687,9 +734,10 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 		allocation.setStatus(AllocationStatus.INACTIVE);
 		allocationRepository.save(allocation);
 		
-		UserSubscription sub = allocation.getUserSubscription();
-		sub.setUsedDoctors(Math.max(0, sub.getUsedDoctors() - 1));
-		subscriptionRepository.save(sub);
+		int activeAllocations = Math.toIntExact(allocationRepository
+				.countByUserSubscriptionIdAndStatus(subscriptionId, AllocationStatus.ACTIVE));
+		lockedSubscription.setUsedDoctors(activeAllocations);
+		subscriptionRepository.save(lockedSubscription);
 	}
 
 	@Override
@@ -722,7 +770,7 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 	public List<FacilityDto> getLinkedHospitals(UUID userId) {
 		User user = userRepository.findById(userId)
 				.orElseThrow(() -> new UserNotFoundException(userId));
-		List<Hospital> hospitals = hospitalRepository.findByOwnerUser(user);
+		List<Hospital> hospitals = hospitalRepository.findByOwner(user);
 		return mapHospitals(hospitals);
 	}
 
@@ -730,7 +778,7 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 	public List<FacilityDto> getLinkedClinics(UUID userId) {
 		User user = userRepository.findById(userId)
 				.orElseThrow(() -> new UserNotFoundException(userId));
-		List<Clinic> clinics = clinicRepository.findByOwnerUser(user);
+		List<Clinic> clinics = clinicRepository.findByOwner(user);
 		return mapClinics(clinics);
 	}
 
@@ -807,6 +855,70 @@ public class UserSubscriptionService implements com.antss_prescription.service.U
 	                return dto.build();
 	            })
 	            .collect(Collectors.toList());
+	}
+
+	private boolean doctorBelongsToOwner(Doctor doctor, User owner) {
+		if (doctor.getHospital() != null) {
+			Hospital hospital = doctor.getHospital();
+			return hospital.getOwner() != null && hospital.getOwner().getId().equals(owner.getId())
+					|| hospital.getUser().getId().equals(owner.getId());
+		}
+		if (doctor.getClinic() != null) {
+			Clinic clinic = doctor.getClinic();
+			return clinic.getOwner() != null && clinic.getOwner().getId().equals(owner.getId())
+					|| clinic.getUser().getId().equals(owner.getId());
+		}
+		return false;
+	}
+
+	private void validateAndSetFacility(DoctorAddon addon, UserSubscription subscription,
+			Long facilityId, FacilityType facilityType) {
+		if (facilityId == null || facilityType == null) {
+			throw new IllegalArgumentException("Facility id and type are required");
+		}
+		UUID ownerId = subscription.getUser().getId();
+		if (facilityType == FacilityType.HOSPITAL) {
+			Hospital hospital = hospitalRepository.findById(facilityId)
+					.orElseThrow(() -> new RuntimeException("Hospital not found: " + facilityId));
+			if (!facilityBelongsToOwner(hospital.getUser(), hospital.getOwner(), ownerId)) {
+				throw new RuntimeException("Hospital does not belong to the subscription owner");
+			}
+		} else {
+			Clinic clinic = clinicRepository.findById(facilityId)
+					.orElseThrow(() -> new RuntimeException("Clinic not found: " + facilityId));
+			if (!facilityBelongsToOwner(clinic.getUser(), clinic.getOwner(), ownerId)) {
+				throw new RuntimeException("Clinic does not belong to the subscription owner");
+			}
+		}
+		addon.setFacilityId(facilityId);
+		addon.setFacilityType(facilityType);
+	}
+
+	private boolean facilityBelongsToOwner(User facilityUser, User owner, UUID ownerId) {
+		return facilityUser != null && ownerId.equals(facilityUser.getId())
+				|| owner != null && ownerId.equals(owner.getId());
+	}
+
+	private void syncAllowedDoctorEntitlement(UUID subscriptionId) {
+		UserSubscription subscription = subscriptionRepository.findByIdForUpdate(subscriptionId)
+				.orElseThrow(() -> new RuntimeException("Subscription not found: " + subscriptionId));
+		int addonDoctors = addonRepository.findApprovedAndPaidBySubscriptionId(subscriptionId).stream()
+				.filter(addon -> !addon.getEndDate().isBefore(LocalDate.now()))
+				.mapToInt(DoctorAddon::getAdditionalDoctors)
+				.sum();
+		subscription.setAllowedDoctors(
+				subscription.getSubscriptionPackage().getBaseDoctorLimit() + addonDoctors);
+		subscriptionRepository.save(subscription);
+	}
+
+	private void syncUsedDoctorCount(UUID userId) {
+		UserSubscription subscription = subscriptionRepository
+				.findValidByUserIdForUpdate(userId, LocalDate.now()).stream().findFirst()
+				.orElseThrow(() -> new NoActiveSubscriptionException(userId));
+		int activeAllocations = Math.toIntExact(allocationRepository
+				.countByUserSubscriptionIdAndStatus(subscription.getId(), AllocationStatus.ACTIVE));
+		subscription.setUsedDoctors(activeAllocations);
+		subscriptionRepository.save(subscription);
 	}
 
 }

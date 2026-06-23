@@ -18,13 +18,13 @@ import com.antss_prescription.entity.prescription.Consultation;
 import com.antss_prescription.entity.prescription.Diagnosis;
 import com.antss_prescription.entity.prescription.Document;
 import com.antss_prescription.entity.prescription.GeneralExamination;
-import com.antss_prescription.entity.prescription.Investigations;
+import com.antss_prescription.entity.prescription.DiagnosticOrder;
 import com.antss_prescription.entity.prescription.PastMedicalHistory;
 import com.antss_prescription.entity.prescription.Patient;
 import com.antss_prescription.entity.prescription.PatientRegistration;
 import com.antss_prescription.entity.prescription.Prescription;
 import com.antss_prescription.entity.prescription.PrescriptionMedicines;
-import com.antss_prescription.entity.prescription.TestRequested;
+import com.antss_prescription.enums.DiagnosticStatus;
 import com.antss_prescription.entity.prescription.Vitals;
 import com.antss_prescription.entity.Doctor;
 import com.antss_prescription.repository.prescription.CheifComplaintsRepo;
@@ -32,12 +32,11 @@ import com.antss_prescription.repository.prescription.ConsultationRepo;
 import com.antss_prescription.repository.prescription.DaignosisRepo;
 import com.antss_prescription.repository.prescription.DocumentRepo;
 import com.antss_prescription.repository.prescription.GeneralExaminationRepo;
-import com.antss_prescription.repository.prescription.InvestigationsRepo;
+import com.antss_prescription.repository.prescription.DiagnosticOrderRepository;
 import com.antss_prescription.repository.prescription.PastMedicalHistoryRepo;
 import com.antss_prescription.repository.prescription.PatientRegistrationRepo;
 import com.antss_prescription.repository.prescription.PrescriptionMedicinesRepo;
 import com.antss_prescription.repository.prescription.PrescriptionRepo;
-import com.antss_prescription.repository.prescription.TestRequestedRepo;
 import com.antss_prescription.repository.prescription.VitalsRepo;
 import com.antss_prescription.service.PrescriptionService;
 import com.antss_prescription.security.AccessControlService;
@@ -59,8 +58,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     private final ConsultationRepo consultationRepository;
     private final PrescriptionRepo prescriptionRepository;
     private final PrescriptionMedicinesRepo prescriptionMedicinesRepository;
-    private final InvestigationsRepo investigationsRepo;
-    private final TestRequestedRepo testRequestedRepo;
+    private final DiagnosticOrderRepository diagnosticOrderRepository;
     private final DocumentRepo documentRepo;
     private final AccessControlService accessControl;
 
@@ -268,50 +266,18 @@ public class PrescriptionServiceImpl implements PrescriptionService {
         }
 
         // =========================
-        // Save Investigations
+        // Save diagnostic orders
         // =========================
 
-        if (req.getInvestigations() != null) {
-
-            for (SavePrescriptionRequest.InvestigationRequest i
-                    : req.getInvestigations()) {
-
-                Investigations investigation = new Investigations();
-                investigation.setInestigationName(i.getInvestigationName());
-                investigation.setNotes(i.getNotes());
-                investigation.setPrescription(prescription);
-                investigation.setPatientRegistration(
-                        consultation.getPatientRegistration());
-                investigation.setCreateAt(LocalDateTime.now());
-                investigation.setUpdatedAt(LocalDateTime.now());
-                
-                if (i.getDocumentUrl() != null && !i.getDocumentUrl().isEmpty()) {
-                    documentRepo.findByUrl(i.getDocumentUrl())
-                            .ifPresent(investigation::setDocument);
-                }
-                
-                investigationsRepo.save(investigation);
-            }
-        }
-
-        // =========================
-        // Save Test Requested
-        // =========================
-
-        if (req.getTestRequested() != null) {
-
-            for (SavePrescriptionRequest.TestRequestedRequest t
-                    : req.getTestRequested()) {
-
-                TestRequested testRequested = new TestRequested();
-                testRequested.setTestName(t.getTestName());
-                testRequested.setNotes(t.getNotes());
-                testRequested.setPrescription(prescription);
-                testRequested.setPatientRegistration(
-                        consultation.getPatientRegistration());
-                testRequested.setCreateAt(LocalDateTime.now());
-                testRequested.setUpdatedAt(LocalDateTime.now());
-                testRequestedRepo.save(testRequested);
+        if (req.getDiagnostics() != null) {
+            for (SavePrescriptionRequest.DiagnosticRequest item : req.getDiagnostics()) {
+                DiagnosticOrder order = new DiagnosticOrder();
+                order.setTestName(item.getTestName());
+                order.setNotes(item.getNotes());
+                order.setStatus(DiagnosticStatus.REQUESTED);
+                order.setPrescription(prescription);
+                order.setPatientRegistration(consultation.getPatientRegistration());
+                diagnosticOrderRepository.save(order);
             }
         }
 
@@ -360,10 +326,12 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     @Override
     public List<PrescriptionResponse> getAllPrescriptions() {
 
-        var user = accessControl.currentUser();
-        return prescriptionRepository.findAll()
+        var scope = accessControl.currentClinicalScope();
+        List<Prescription> prescriptions = scope.admin()
+                ? prescriptionRepository.findAll()
+                : prescriptionRepository.findAccessible(scope.hospitalIds(), scope.clinicIds());
+        return prescriptions
                 .stream()
-                .filter(prescription -> accessControl.canAccess(prescription, user))
                 .map(prescription -> {
                     Consultation consultation = prescription.getConsultation();
                     PatientRegistration registration =
@@ -594,53 +562,20 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
     }
 
     // =========================
-    // Replace Investigations
+    // Replace diagnostic orders
     // =========================
 
-    investigationsRepo.deleteByPrescription(prescription);
+    diagnosticOrderRepository.deleteByPrescription(prescription);
 
-    if (req.getInvestigations() != null) {
-
-        for (SavePrescriptionRequest.InvestigationRequest i
-                : req.getInvestigations()) {
-
-            Investigations investigation = new Investigations();
-            investigation.setInestigationName(i.getInvestigationName());
-            investigation.setNotes(i.getNotes());
-            investigation.setPrescription(prescription);
-            investigation.setPatientRegistration(
-                    consultation.getPatientRegistration());
-            investigation.setCreateAt(LocalDateTime.now());
-            investigation.setUpdatedAt(LocalDateTime.now());
-
-            if (i.getDocumentUrl() != null && !i.getDocumentUrl().isEmpty()) {
-                documentRepo.findByUrl(i.getDocumentUrl())
-                        .ifPresent(investigation::setDocument);
-            }
-
-            investigationsRepo.save(investigation);
-        }
-    }
-
-    // =========================
-    // Replace Test Requested
-    // =========================
-
-    testRequestedRepo.deleteByPrescription(prescription);
-
-    if (req.getTestRequested() != null) {
-
-        for (SavePrescriptionRequest.TestRequestedRequest t
-                : req.getTestRequested()) {
-
-            TestRequested testRequested = new TestRequested();
-            testRequested.setTestName(t.getTestName());
-            testRequested.setPrescription(prescription);
-            testRequested.setPatientRegistration(
-                    consultation.getPatientRegistration());
-            testRequested.setCreateAt(LocalDateTime.now());
-            testRequested.setUpdatedAt(LocalDateTime.now());
-            testRequestedRepo.save(testRequested);
+    if (req.getDiagnostics() != null) {
+        for (SavePrescriptionRequest.DiagnosticRequest item : req.getDiagnostics()) {
+            DiagnosticOrder order = new DiagnosticOrder();
+            order.setTestName(item.getTestName());
+            order.setNotes(item.getNotes());
+            order.setStatus(DiagnosticStatus.REQUESTED);
+            order.setPrescription(prescription);
+            order.setPatientRegistration(consultation.getPatientRegistration());
+            diagnosticOrderRepository.save(order);
         }
     }
 
@@ -674,8 +609,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
         // =========================
 
         prescriptionMedicinesRepository.deleteByPrescription(prescription);
-        investigationsRepo.deleteByPrescription(prescription);
-        testRequestedRepo.deleteByPrescription(prescription);
+        diagnosticOrderRepository.deleteByPrescription(prescription);
 
         // =========================
         // Delete Prescription
@@ -781,18 +715,11 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                 prescriptionMedicinesRepository.findByPrescription(prescription);
 
         // =========================
-        // Fetch Investigations
+        // Fetch diagnostic orders
         // =========================
 
-        List<Investigations> investigations =
-                investigationsRepo.findByPrescription(prescription);
-
-        // =========================
-        // Fetch Test Requested
-        // =========================
-
-        List<TestRequested> testRequestedList =
-                testRequestedRepo.findByPrescription(prescription);
+        List<DiagnosticOrder> diagnostics =
+                diagnosticOrderRepository.findByPrescription(prescription);
 
         // =========================
         // Fetch Documents
@@ -972,36 +899,23 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                         .collect(Collectors.toList());
 
         // =========================
-        // Investigations
+        // Diagnostic orders
         // =========================
 
-        List<DetailedPrescriptionResponse.InvestigationDetailResponse> investigationDetails =
+        List<DetailedPrescriptionResponse.DiagnosticDetailResponse> diagnosticDetails =
 
-                investigations.stream()
-                        .map(i -> DetailedPrescriptionResponse.InvestigationDetailResponse
+                diagnostics.stream()
+                        .map(item -> DetailedPrescriptionResponse.DiagnosticDetailResponse
                                 .builder()
-                                .id(i.getId())
-                                .investigationName(i.getInestigationName())
-                                .notes(i.getNotes())
-                                .createdAt(i.getCreateAt())
-                                .documentUrl(i.getDocument() != null ? i.getDocument().getUrl() : null)
-                                .documentFileName(i.getDocument() != null ? i.getDocument().getFileName() : null)
-                                .build())
-                        .collect(Collectors.toList());
-
-        // =========================
-        // Test Requested
-        // =========================
-
-        List<DetailedPrescriptionResponse.TestRequestedDetailResponse> testRequestedDetails =
-
-                testRequestedList.stream()
-                        .map(t -> DetailedPrescriptionResponse.TestRequestedDetailResponse
-                                .builder()
-                                .id(t.getId())
-                                .testName(t.getTestName())
-                                .notes(t.getNotes())
-                                .createdAt(t.getCreateAt())
+                                .id(item.getId())
+                                .testName(item.getTestName())
+                                .notes(item.getNotes())
+                                .resultSummary(item.getResultSummary())
+                                .status(item.getStatus())
+                                .requestedAt(item.getRequestedAt())
+                                .completedAt(item.getCompletedAt())
+                                .reportDocumentId(item.getReportDocument() == null
+                                        ? null : item.getReportDocument().getId())
                                 .build())
                         .collect(Collectors.toList());
 
@@ -1030,8 +944,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                 .createdAt(prescription.getCreatedAt())
                 .consultation(consultationResponse)
                 .medicines(medicineDetails)
-                .investigations(investigationDetails)
-                .testRequested(testRequestedDetails)
+                .diagnostics(diagnosticDetails)
                 .documents(documentDetails)
                 .build();
     }

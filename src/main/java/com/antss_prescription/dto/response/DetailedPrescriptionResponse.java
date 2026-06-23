@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.antss_prescription.enums.DiagnosticStatus;
 
 @Data
 @Builder
@@ -28,27 +29,19 @@ public class DetailedPrescriptionResponse {
         private String quantity;
     }
  // In DetailedPrescriptionResponse.java — add these fields
-    private List<InvestigationDetailResponse> investigations;
-    private List<TestRequestedDetailResponse> testRequested;
+    private List<DiagnosticDetailResponse> diagnostics;
 
     @Data
     @Builder
-    public static class InvestigationDetailResponse {
-        private int id;
-        private String investigationName;
-        private String notes;
-        private LocalDateTime createdAt;
-        private String documentUrl;
-        private String documentFileName;
-    }
-
-    @Data
-    @Builder
-    public static class TestRequestedDetailResponse {
+    public static class DiagnosticDetailResponse {
         private int id;
         private String testName;
         private String notes;
-        private LocalDateTime createdAt;
+        private String resultSummary;
+        private DiagnosticStatus status;
+        private LocalDateTime requestedAt;
+        private LocalDateTime completedAt;
+        private Integer reportDocumentId;
     }
     @Data
     @Builder

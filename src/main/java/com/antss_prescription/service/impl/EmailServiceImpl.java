@@ -124,14 +124,14 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public void sendApprovalEmail(String toEmail, String fullName, String generatedPassword) {
+    public void sendApprovalEmail(String toEmail, String fullName, String setupToken) {
         String subject = "Account Approved - Antss Prescription";
         String body = "Dear " + fullName + ",\n\n" +
                 "Your account has been approved. You can now log in to the Antss Prescription portal.\n\n" +
-                "Your Login Credentials:\n" +
+                "Your username and one-time password setup token:\n" +
                 "Username: " + toEmail + "\n" +
-                "Password: " + generatedPassword + "\n\n" +
-                "Please change your password after logging in for security purposes.\n\n" +
+                "Setup Token: " + setupToken + "\n\n" +
+                "Use this token with the reset-password endpoint within 1 hour to choose your password.\n\n" +
                 "Thank you for choosing Antss Prescription.";
         sendEmail(toEmail, subject, body);
     }
@@ -166,15 +166,15 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public void sendCredentialsEmail(String toEmail, String entityName, String username, String plainPassword, String roleName, java.time.LocalDate endDate) {
+    public void sendCredentialsEmail(String toEmail, String entityName, String username, String setupToken, String roleName, java.time.LocalDate endDate) {
         String subject = "Access Credentials - Antss Prescription";
         String body = "Dear " + entityName + ",\n\n" +
                 "You have been added to the Antss Prescription portal as a " + roleName + ".\n\n" +
-                "Your Access Credentials:\n" +
+                "Your account setup details:\n" +
                 "Username/Email: " + username + "\n" +
-                "Password: " + plainPassword + "\n\n" +
+                "Setup Token: " + setupToken + "\n\n" +
                 "Your subscription / validity is active until: " + endDate + "\n\n" +
-                "Please use these credentials to log in to the Antss portal.\n\n" +
+                "Use this token with the reset-password endpoint within 1 hour to choose your password.\n\n" +
                 "Thank you.";
         sendEmail(toEmail, subject, body);
     }
@@ -190,7 +190,7 @@ public class EmailServiceImpl implements EmailService {
             log.info("Email sent to: {}", to);
         } catch (Exception e) {
             log.error("Failed to send email to {}: {}", to, e.getMessage());
-            throw new com.antss_prescription.exception.BusinessException("Failed to send email to " + to + ": " + e.getMessage());
+            throw new com.antss_prescription.exception.BusinessException("Unable to send email at this time");
         }
     }
 
@@ -206,7 +206,7 @@ public class EmailServiceImpl implements EmailService {
             log.info("HTML Email sent to: {}", to);
         } catch (Exception e) {
             log.error("Failed to send HTML email to {}: {}", to, e.getMessage());
-            throw new com.antss_prescription.exception.BusinessException("Failed to send HTML email to " + to + ": " + e.getMessage());
+            throw new com.antss_prescription.exception.BusinessException("Unable to send email at this time");
         }
     }
 }

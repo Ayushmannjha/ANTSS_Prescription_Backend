@@ -3,6 +3,7 @@ package com.antss_prescription.service;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import com.antss_prescription.enums.FacilityType;
 
 import com.antss_prescription.dto.request.UserSubscriptionSummaryDto;
 import com.antss_prescription.dto.request.UserSubscriptionSummaryDto.DoctorAddonDto;
@@ -233,7 +234,7 @@ public interface UserSubscriptionService {
      * @param additionalDoctors  number of extra doctors requested
      * @return id of the created DoctorAddon
      */
-    Long requestDoctorAddon(UUID subscriptionId, int additionalDoctors);
+    Long requestDoctorAddon(UUID subscriptionId, int additionalDoctors, Long facilityId, FacilityType facilityType);
 
     /**
      * Admin approves a pending doctor addon. Sets approvalStatus = APPROVED,

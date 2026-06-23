@@ -73,6 +73,10 @@ public class UserSubscriptionSummaryDto {
         private String paymentStatus;
         private LocalDateTime approvedAt;
         private String approvedByName;
+        private Long facilityId;
+        private String facilityType;
+        private String rejectionReason;
+        private String paymentTransactionRef;
     }
  
     // ── Nested: allocated doctor detail ───────────────────────────────────

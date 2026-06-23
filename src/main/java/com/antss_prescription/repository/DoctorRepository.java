@@ -3,6 +3,7 @@ package com.antss_prescription.repository;
 import com.antss_prescription.entity.Clinic;
 import com.antss_prescription.entity.Doctor;
 import com.antss_prescription.entity.Hospital;
+import com.antss_prescription.enums.EntityStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -15,7 +16,7 @@ public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
     Optional<Doctor> findByDoctorCode(String doctorCode);
     List<Doctor> findByHospital(Hospital hospital);
     List<Doctor> findByClinic(Clinic clinic);
-    List<Doctor> findByHospitalId(Long hospitalId);
-    List<Doctor> findByClinicId(Long clinicId);
     Optional<Doctor> findByUserId(UUID userId);
+    long countByHospitalAndStatus(Hospital hospital, EntityStatus status);
+    long countByClinicAndStatus(Clinic clinic, EntityStatus status);
 }

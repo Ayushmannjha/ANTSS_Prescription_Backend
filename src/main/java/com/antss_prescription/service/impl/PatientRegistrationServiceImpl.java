@@ -15,6 +15,8 @@ import com.antss_prescription.entity.prescription.PatientRegistration;
 import com.antss_prescription.exception.DuplicateRegistrationException;
 import com.antss_prescription.repository.prescription.PatientRegistrationRepo;
 import com.antss_prescription.repository.prescription.PatientRepo;
+import com.antss_prescription.repository.prescription.ConsultationRepo;
+import com.antss_prescription.exception.ConflictException;
 import com.antss_prescription.repository.ClinicRepository;
 import com.antss_prescription.repository.HospitalRepository;
 import com.antss_prescription.security.AccessControlService;
@@ -32,6 +34,7 @@ public class PatientRegistrationServiceImpl
     private final ClinicRepository clinicRepository;
     private final HospitalRepository hospitalRepository;
     private final AccessControlService accessControl;
+    private final ConsultationRepo consultationRepository;
 
     @Override
     @Transactional
@@ -120,7 +123,7 @@ public class PatientRegistrationServiceImpl
 
         // Step 4 — Get next sequence number for this prefix + financial year
         String prefixWithYear = prefix + financialYear;
-        int nextNumber = getNextSequenceNumber(prefixWithYear);
+        long nextNumber = registrationRepo.nextRegistrationSequenceValue();
 
         return prefixWithYear + "/" + nextNumber;
     }
@@ -229,34 +232,6 @@ public class PatientRegistrationServiceImpl
         return start + end;
     }
 
-    private int getNextSequenceNumber(String prefixWithYear) {
-        List<PatientRegistration> existing = registrationRepo
-                .findByRegistrationNumberStartingWith(prefixWithYear + "/");
-
-        if (existing.isEmpty()) {
-            return 1;
-        }
-
-        // Extract the sequence numbers and find max
-        int max = 0;
-        for (PatientRegistration reg : existing) {
-            try {
-                String regNumber = reg.getRegistrationNumber();
-                String[] parts = regNumber.split("/");
-                if (parts.length == 2) {
-                    int seq = Integer.parseInt(parts[1]);
-                    if (seq > max) {
-                        max = seq;
-                    }
-                }
-            } catch (NumberFormatException e) {
-                // skip malformed numbers
-            }
-        }
-
-        return max + 1;
-    }
-    
     @Override
     public PatientRegistrationResponse getRegistrationById(Integer registrationId) {
 
@@ -284,10 +259,12 @@ public class PatientRegistrationServiceImpl
     }
     @Override
     public List<PatientRegistrationResponse> getAllRegistrations() {
-        var user = accessControl.currentUser();
-        return registrationRepo.findAll()
+        var scope = accessControl.currentClinicalScope();
+        List<PatientRegistration> registrations = scope.admin()
+                ? registrationRepo.findAll()
+                : registrationRepo.findAccessible(scope.hospitalIds(), scope.clinicIds());
+        return registrations
                 .stream()
-                .filter(reg -> accessControl.canAccess(reg, user))
                 .map(reg -> {
                     PatientRegistrationResponse response = new PatientRegistrationResponse();
                     response.setRegistrationId(reg.getRegistrationId());
@@ -320,7 +297,6 @@ public class PatientRegistrationServiceImpl
 
         accessControl.requireRegistrationAccess(existing);
         resolveAndAuthorizeFacility(registration);
-        existing.setRegistrationNumber(registration.getRegistrationNumber());
         existing.setPatient(registration.getPatient());
         existing.setClinic(registration.getClinic());
         existing.setHospital(registration.getHospital());
@@ -357,6 +333,9 @@ public class PatientRegistrationServiceImpl
                                         + registrationId));
 
         accessControl.requireRegistrationAccess(registration);
+        if (consultationRepository.existsByPatientRegistration(registration)) {
+            throw new ConflictException("Registration cannot be deleted while consultations exist");
+        }
         registrationRepo.delete(registration);
     }
 

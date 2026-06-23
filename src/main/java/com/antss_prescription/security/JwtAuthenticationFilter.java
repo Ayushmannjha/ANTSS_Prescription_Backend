@@ -23,6 +23,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserDetailsServiceImpl userDetailsService;
     private final LoginSessionRepository loginSessionRepository;
+    private final TokenHashService tokenHashService;
 
 
     @Override
@@ -31,12 +32,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         String token = extractTokenFromRequest(request);
 
-        if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
-            boolean sessionActive = loginSessionRepository.findByTokenAndExpiredFalse(token).isPresent();
+        if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token, "access")) {
+            boolean sessionActive = loginSessionRepository
+                    .findByTokenAndExpiredFalse(tokenHashService.hash(token)).isPresent();
             if (sessionActive) {
                 String email = jwtTokenProvider.getEmailFromToken(token);
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                if (userDetails.isEnabled() && "access".equals(jwtTokenProvider.getTokenType(token))) {
+                if (userDetails.isEnabled()) {
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
