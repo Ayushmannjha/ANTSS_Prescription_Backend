@@ -8,6 +8,5 @@ import java.util.List;
 
 @Repository
 public interface PackageRepository extends JpaRepository<SubscriptionPackage, Long> {
-    List<SubscriptionPackage> findByIsActiveTrue();
     boolean existsByPackageName(String packageName);
 }

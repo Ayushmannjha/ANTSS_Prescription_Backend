@@ -26,9 +26,14 @@ public class DoctorAddonResponse {
     private AddonApprovalStatus approvalStatus;
     private UUID approvedByUserId;
     private LocalDateTime approvedAt;
+    private UUID rejectedByUserId;
+    private LocalDateTime rejectedAt;
+    private String rejectionReason;
+    private String paymentTransactionRef;
     private String username;
     private String userEmail;
     private String entityName;
+    private Long entityId;
     private String entityType;
     private String state;
     private String city;

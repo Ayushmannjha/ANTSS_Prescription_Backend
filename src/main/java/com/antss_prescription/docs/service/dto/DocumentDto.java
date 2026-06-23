@@ -15,6 +15,7 @@ public class DocumentDto {
     private Integer id;
     private String fileName;
     private String url;
+    private String documentType;
 
     private int patientId;
     private String patientName;

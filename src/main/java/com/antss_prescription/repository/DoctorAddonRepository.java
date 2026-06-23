@@ -1,18 +1,24 @@
 package com.antss_prescription.repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 
 import com.antss_prescription.entity.DoctorAddon;
 import com.antss_prescription.enums.AddonApprovalStatus;
 
 @Repository
 public interface DoctorAddonRepository extends JpaRepository<DoctorAddon, Long> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT da FROM DoctorAddon da WHERE da.id = :id")
+    Optional<DoctorAddon> findByIdForUpdate(@Param("id") Long id);
     List<DoctorAddon> findByUserSubscriptionId(UUID userSubscriptionId);
     List<DoctorAddon> findByApprovalStatus(AddonApprovalStatus approvalStatus);
     

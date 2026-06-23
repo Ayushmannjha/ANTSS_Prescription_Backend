@@ -9,12 +9,14 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import org.hibernate.annotations.Check;
 
 @Entity
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
+@Check(constraints = "(hospital_id IS NOT NULL AND clinic_id IS NULL) OR (hospital_id IS NULL AND clinic_id IS NOT NULL)")
 public class Doctor {
 
     @Id

@@ -3,6 +3,7 @@ package com.antss_prescription.controller;
 import java.util.List;
 
 import com.antss_prescription.dto.response.DetailedPrescriptionResponse;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,7 +30,7 @@ public class PrescriptionController {
 
     @PostMapping("/save")
     public ResponseEntity<PrescriptionResponse> save(
-            @RequestBody SavePrescriptionRequest request) {
+            @Valid @RequestBody SavePrescriptionRequest request) {
         return ResponseEntity.ok(prescriptionService.savePrescription(request));
     }
 
@@ -71,7 +72,7 @@ public class PrescriptionController {
     @PutMapping("/update/{id}")
     public ResponseEntity<PrescriptionResponse> update(
             @PathVariable int id,
-            @RequestBody UpdatePrescriptionRequest request) {
+            @Valid @RequestBody UpdatePrescriptionRequest request) {
         return ResponseEntity.ok(prescriptionService.updatePrescription(id, request));
     }
 

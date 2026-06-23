@@ -2,12 +2,14 @@ package com.antss_prescription.controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.antss_prescription.entity.prescription.Patient;
+import com.antss_prescription.dto.request.PatientRequest;
+import com.antss_prescription.dto.request.ClinicalRequestMapper;
 import com.antss_prescription.service.PatientService;
 
 @RestController
@@ -19,9 +21,9 @@ public class PatientController {
 
     // Create Patient
     @PostMapping
-    public ResponseEntity<Patient> savePatient(@RequestBody Patient patient) {
+    public ResponseEntity<Patient> savePatient(@Valid @RequestBody PatientRequest request) {
 
-        Patient savedPatient = patientService.savePatient(patient);
+        Patient savedPatient = patientService.savePatient(ClinicalRequestMapper.toPatient(request));
 
         return ResponseEntity.ok(savedPatient);
     }
@@ -49,10 +51,10 @@ public class PatientController {
     @PutMapping("/{patientId}")
     public ResponseEntity<Patient> updatePatient(
             @PathVariable Integer patientId,
-            @RequestBody Patient patient) {
+            @Valid @RequestBody PatientRequest request) {
 
         Patient updatedPatient =
-                patientService.updatePatient(patientId, patient);
+                patientService.updatePatient(patientId, ClinicalRequestMapper.toPatient(request));
 
         return ResponseEntity.ok(updatedPatient);
     }

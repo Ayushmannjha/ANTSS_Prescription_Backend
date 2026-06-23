@@ -5,9 +5,9 @@ public interface EmailService {
                                              String clinicName, String email,
                                              String packageName, int numDoctors,
                                              String approvalUrl);
-    void sendApprovalEmail(String toEmail, String fullName, String generatedPassword);
+    void sendApprovalEmail(String toEmail, String fullName);
     void sendRejectionEmail(String toEmail, String fullName);
     void sendExpiryReminderEmail(String toEmail, String fullName);
     void sendPasswordResetEmail(String toEmail, String fullName, String resetToken);
-    void sendCredentialsEmail(String toEmail, String entityName, String username, String plainPassword, String roleName, java.time.LocalDate endDate);
+    void sendCredentialsEmail(String toEmail, String entityName, String username, String roleName, java.time.LocalDate endDate);
 }

@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 
 import com.antss_prescription.entity.User;
 import com.antss_prescription.entity.UserSubscription;
@@ -16,10 +18,41 @@ import com.antss_prescription.enums.SubscriptionStatus;
 
 @Repository
 public interface UserSubscriptionRepository extends JpaRepository<UserSubscription, UUID> {
-    List<UserSubscription> findByUser(User user);
     List<UserSubscription> findByUserId(UUID userId);
     List<UserSubscription> findByUserIdAndSubscriptionStatus(UUID userId, SubscriptionStatus subscriptionStatus);
     List<UserSubscription> findBySubscriptionStatus(SubscriptionStatus subscriptionStatus);
+
+    @Query("""
+            SELECT us FROM UserSubscription us
+            JOIN FETCH us.subscriptionPackage
+            WHERE us.user.id = :userId
+              AND us.subscriptionStatus = 'ACTIVE'
+              AND us.paymentStatus = 'PAID'
+              AND us.endDate >= :today
+            ORDER BY us.startDate DESC
+            """)
+    List<UserSubscription> findValidByUserId(@Param("userId") UUID userId,
+                                             @Param("today") LocalDate today);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT us FROM UserSubscription us WHERE us.id = :id")
+    Optional<UserSubscription> findByIdForUpdate(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT us FROM UserSubscription us WHERE us.user.id = :userId")
+    List<UserSubscription> findByUserIdForUpdate(@Param("userId") UUID userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT us FROM UserSubscription us
+            WHERE us.user.id = :userId
+              AND us.subscriptionStatus = 'ACTIVE'
+              AND us.paymentStatus = 'PAID'
+              AND us.endDate >= :today
+            ORDER BY us.startDate DESC
+            """)
+    List<UserSubscription> findValidByUserIdForUpdate(@Param("userId") UUID userId,
+                                                      @Param("today") LocalDate today);
     
     @Query("""
             SELECT us FROM UserSubscription us

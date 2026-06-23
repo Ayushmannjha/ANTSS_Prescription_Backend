@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.antss_prescription.dto.request.UserSubscriptionSummaryDto;
 import com.antss_prescription.dto.request.UserSubscriptionSummaryDto.DoctorAddonDto;
+import com.antss_prescription.enums.FacilityType;
 import com.antss_prescription.dto.request.UserSubscriptionSummaryDto.DoctorAllocationDto;
 import com.antss_prescription.dto.request.UserSubscriptionSummaryDto.FacilityDto;
 import com.antss_prescription.dto.response.UserBasicDto;
@@ -42,10 +43,9 @@ public class UserSubscriptionController {
      * Access: ADMIN or the user themselves.
      */
     @GetMapping("/{userId}/summary")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<UserSubscriptionSummaryDto> getSubscriptionSummary(
             @PathVariable UUID userId) {
-        System.out.println("====request comes======");
         UserSubscriptionSummaryDto summary =
                 subscriptionService.getUserSubscriptionSummary(userId);
         return ResponseEntity.ok(summary);
@@ -58,7 +58,7 @@ public class UserSubscriptionController {
      * Used internally by other services before allowing doctor adds, etc.
      */
     @GetMapping("/{userId}/valid")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<Boolean> isSubscriptionValid(@PathVariable UUID userId) {
         return ResponseEntity.ok(subscriptionService.hasValidSubscription(userId));
     }
@@ -69,7 +69,7 @@ public class UserSubscriptionController {
      * Returns how many more doctors can still be added.
      */
     @GetMapping("/{userId}/doctor-slots")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<Integer> getRemainingDoctorSlots(@PathVariable UUID userId) {
         return ResponseEntity.ok(subscriptionService.getRemainingDoctorSlots(userId));
     }
@@ -84,7 +84,7 @@ public class UserSubscriptionController {
     // =========================================================================
 
     @GetMapping("/{userId}/history")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<List<UserSubscriptionSummaryDto>> getSubscriptionHistory(@PathVariable UUID userId) {
         return ResponseEntity.ok(subscriptionService.getSubscriptionHistory(userId));
     }
@@ -106,25 +106,25 @@ public class UserSubscriptionController {
     // =========================================================================
 
     @GetMapping("/{userId}/can-add-doctor")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<Boolean> canAddDoctor(@PathVariable UUID userId) {
         return ResponseEntity.ok(subscriptionService.canAddDoctor(userId));
     }
 
     @GetMapping("/{userId}/can-add-hospital")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<Boolean> canAddHospital(@PathVariable UUID userId) {
         return ResponseEntity.ok(subscriptionService.canAddHospital(userId));
     }
 
     @GetMapping("/{userId}/can-add-clinic")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<Boolean> canAddClinic(@PathVariable UUID userId) {
         return ResponseEntity.ok(subscriptionService.canAddClinic(userId));
     }
 
     @GetMapping("/{userId}/can-create-prescription")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<Boolean> canCreatePrescription(@PathVariable UUID userId) {
         return ResponseEntity.ok(subscriptionService.canCreatePrescription(userId));
     }
@@ -134,26 +134,26 @@ public class UserSubscriptionController {
     // =========================================================================
 
     @GetMapping("/{userId}/effective-allowed-doctors")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<Integer> getEffectiveAllowedDoctors(@PathVariable UUID userId) {
         return ResponseEntity.ok(subscriptionService.getEffectiveAllowedDoctors(userId));
     }
 
     @GetMapping("/{userId}/used-doctor-count")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Integer> getUsedDoctorCount(@PathVariable UUID userId) {
         return ResponseEntity.ok(subscriptionService.getUsedDoctorCount(userId));
     }
 
     @PostMapping("/{userId}/increment-used-doctors")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> incrementUsedDoctors(@PathVariable UUID userId) {
         subscriptionService.incrementUsedDoctors(userId);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{userId}/decrement-used-doctors")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> decrementUsedDoctors(@PathVariable UUID userId) {
         subscriptionService.decrementUsedDoctors(userId);
         return ResponseEntity.ok().build();
@@ -164,25 +164,25 @@ public class UserSubscriptionController {
     // =========================================================================
 
     @PostMapping("/{userId}/create")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UUID> createSubscription(@PathVariable UUID userId, @RequestParam Long packageId) {
         return ResponseEntity.ok(subscriptionService.createSubscription(userId, packageId));
     }
 
     @PostMapping("/{subscriptionId}/renew")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    @PreAuthorize("@subscriptionAuthorization.canAccessSubscription(#subscriptionId)")
     public ResponseEntity<UserSubscriptionSummaryDto> renewSubscription(@PathVariable UUID subscriptionId) {
         return ResponseEntity.ok(subscriptionService.renewSubscription(subscriptionId));
     }
 
     @PostMapping("/{userId}/upgrade")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<UserSubscriptionSummaryDto> upgradeSubscription(@PathVariable UUID userId, @RequestParam Long newPackageId) {
         return ResponseEntity.ok(subscriptionService.upgradeSubscription(userId, newPackageId));
     }
 
     @PostMapping("/{userId}/cancel")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<Void> cancelSubscription(@PathVariable UUID userId, @RequestParam UUID cancelledBy) {
         subscriptionService.cancelSubscription(userId, cancelledBy);
         return ResponseEntity.ok().build();
@@ -240,9 +240,12 @@ public class UserSubscriptionController {
     // =========================================================================
 
     @PostMapping("/{subscriptionId}/addons/request")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
-    public ResponseEntity<Long> requestDoctorAddon(@PathVariable UUID subscriptionId, @RequestParam int additionalDoctors) {
-        return ResponseEntity.ok(subscriptionService.requestDoctorAddon(subscriptionId, additionalDoctors));
+    @PreAuthorize("@subscriptionAuthorization.canAccessSubscription(#subscriptionId)")
+    public ResponseEntity<Long> requestDoctorAddon(@PathVariable UUID subscriptionId,
+            @RequestParam int additionalDoctors, @RequestParam Long facilityId,
+            @RequestParam FacilityType facilityType) {
+        return ResponseEntity.ok(subscriptionService.requestDoctorAddon(
+                subscriptionId, additionalDoctors, facilityId, facilityType));
     }
 
     @PostMapping("/addons/{addonId}/approve")
@@ -267,13 +270,13 @@ public class UserSubscriptionController {
     }
 
     @GetMapping("/{subscriptionId}/addons")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    @PreAuthorize("@subscriptionAuthorization.canAccessSubscription(#subscriptionId)")
     public ResponseEntity<List<DoctorAddonDto>> getAddonsForSubscription(@PathVariable UUID subscriptionId) {
         return ResponseEntity.ok(subscriptionService.getAddonsForSubscription(subscriptionId));
     }
 
     @GetMapping("/{subscriptionId}/addons/active")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    @PreAuthorize("@subscriptionAuthorization.canAccessSubscription(#subscriptionId)")
     public ResponseEntity<List<DoctorAddonDto>> getActiveAddonsForSubscription(@PathVariable UUID subscriptionId) {
         return ResponseEntity.ok(subscriptionService.getActiveAddonsForSubscription(subscriptionId));
     }
@@ -283,33 +286,33 @@ public class UserSubscriptionController {
     // =========================================================================
 
     @PostMapping("/{subscriptionId}/allocate-doctor")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    @PreAuthorize("@subscriptionAuthorization.canAccessSubscription(#subscriptionId)")
     public ResponseEntity<Void> allocateDoctor(@PathVariable UUID subscriptionId, @RequestParam UUID doctorId, @RequestParam String allocationType) {
         subscriptionService.allocateDoctor(subscriptionId, doctorId, allocationType);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{subscriptionId}/deallocate-doctor")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    @PreAuthorize("@subscriptionAuthorization.canAccessSubscription(#subscriptionId)")
     public ResponseEntity<Void> deallocateDoctor(@PathVariable UUID subscriptionId, @RequestParam UUID doctorId) {
         subscriptionService.deallocateDoctor(subscriptionId, doctorId);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{subscriptionId}/allocations/active")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    @PreAuthorize("@subscriptionAuthorization.canAccessSubscription(#subscriptionId)")
     public ResponseEntity<List<DoctorAllocationDto>> getActiveDoctorAllocations(@PathVariable UUID subscriptionId) {
         return ResponseEntity.ok(subscriptionService.getActiveDoctorAllocations(subscriptionId));
     }
 
     @GetMapping("/{subscriptionId}/allocations")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    @PreAuthorize("@subscriptionAuthorization.canAccessSubscription(#subscriptionId)")
     public ResponseEntity<List<DoctorAllocationDto>> getAllDoctorAllocations(@PathVariable UUID subscriptionId) {
         return ResponseEntity.ok(subscriptionService.getAllDoctorAllocations(subscriptionId));
     }
 
     @GetMapping("/doctor/{doctorId}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    @PreAuthorize("@subscriptionAuthorization.canAccessDoctor(#doctorId)")
     public ResponseEntity<List<UserSubscriptionSummaryDto>> getSubscriptionsForDoctor(@PathVariable UUID doctorId) {
         return ResponseEntity.ok(subscriptionService.getSubscriptionsForDoctor(doctorId));
     }
@@ -319,25 +322,25 @@ public class UserSubscriptionController {
     // =========================================================================
 
     @GetMapping("/{userId}/linked-hospitals")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<List<FacilityDto>> getLinkedHospitals(@PathVariable UUID userId) {
         return ResponseEntity.ok(subscriptionService.getLinkedHospitals(userId));
     }
 
     @GetMapping("/{userId}/linked-clinics")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<List<FacilityDto>> getLinkedClinics(@PathVariable UUID userId) {
         return ResponseEntity.ok(subscriptionService.getLinkedClinics(userId));
     }
 
     @GetMapping("/{userId}/hospital-count")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<Integer> getHospitalCount(@PathVariable UUID userId) {
         return ResponseEntity.ok(subscriptionService.getHospitalCount(userId));
     }
 
     @GetMapping("/{userId}/clinic-count")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.userId")
+    @PreAuthorize("@subscriptionAuthorization.canAccessUser(#userId)")
     public ResponseEntity<Integer> getClinicCount(@PathVariable UUID userId) {
         return ResponseEntity.ok(subscriptionService.getClinicCount(userId));
     }

@@ -54,12 +54,16 @@ public class JwtTokenProvider {
         return parseClaims(token).getSubject();
     }
 
-    public boolean validateToken(String token) {
+    public String getTokenType(String token) {
+        return parseClaims(token).get("type", String.class);
+    }
+
+    public boolean validateToken(String token, String expectedType) {
         try {
-            parseClaims(token);
-            return true;
+            Claims claims = parseClaims(token);
+            return expectedType.equals(claims.get("type", String.class));
         } catch (JwtException | IllegalArgumentException e) {
-            log.warn("Invalid JWT token: {}", e.getMessage());
+            log.warn("Invalid {} JWT token: {}", expectedType, e.getMessage());
             return false;
         }
     }

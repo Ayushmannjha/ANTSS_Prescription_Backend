@@ -13,6 +13,7 @@ import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.repository.*;
 import com.antss_prescription.service.ClinicService;
 import com.antss_prescription.service.EmailService;
+import com.antss_prescription.security.PasswordResetTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -39,6 +40,7 @@ public class ClinicServiceImpl implements ClinicService {
     private final PasswordEncoder passwordEncoder;
     private final ModelMapper modelMapper;
     private final DoctorRepository doctorRepository;
+    private final PasswordResetTokenService passwordResetTokenService;
 
 
     @Override
@@ -51,7 +53,10 @@ public class ClinicServiceImpl implements ClinicService {
         }
 
         List<UserSubscription> activeSubs = userSubscriptionRepository
-                .findByUserIdAndSubscriptionStatus(ownerId, SubscriptionStatus.ACTIVE);
+                .findValidByUserIdForUpdate(ownerId, java.time.LocalDate.now());
+        if (activeSubs.isEmpty()) {
+            throw new BusinessException("An active paid subscription is required to create a clinic");
+        }
         int totalAllowedClinics = activeSubs.stream()
                 .mapToInt(UserSubscription::getAllowedClinics).sum();
         int currentClinics = clinicRepository.findByOwnerId(ownerId).size();
@@ -61,9 +66,7 @@ public class ClinicServiceImpl implements ClinicService {
                     "). Upgrade your plan to add more clinics.");
         }
 
-        java.time.LocalDate subEndDate = activeSubs.isEmpty()
-                ? java.time.LocalDate.now().plusYears(1)
-                : activeSubs.get(0).getEndDate();
+        java.time.LocalDate subEndDate = activeSubs.get(0).getEndDate();
 
         int allowedDoctors = activeSubs.stream()
                 .mapToInt(UserSubscription::getAllowedDoctors).sum();
@@ -107,7 +110,6 @@ public class ClinicServiceImpl implements ClinicService {
                 request.getEmail(),
                 request.getClinicName(),
                 request.getEmail(),
-                plainPassword,
                 "Clinic",
                 subEndDate
         );
@@ -131,7 +133,8 @@ public class ClinicServiceImpl implements ClinicService {
         Clinic clinic = clinicRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Clinic", id));
         
-        boolean hasAccess = clinic.getUser().getId().equals(userId);
+        boolean hasAccess = clinic.getUser().getId().equals(userId)
+                || (clinic.getOwner() != null && clinic.getOwner().getId().equals(userId));
         if (!hasAccess) {
             // Check if user is a doctor of this clinic
             hasAccess = doctorRepository.findByUserId(userId)

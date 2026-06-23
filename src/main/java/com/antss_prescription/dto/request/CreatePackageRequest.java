@@ -9,6 +9,7 @@ import lombok.Data;
 public class CreatePackageRequest {
 
     @NotBlank
+    @Size(max = 100)
     private String packageName;
 
     @NotNull
@@ -19,13 +20,16 @@ public class CreatePackageRequest {
     private Integer baseDoctorLimit;
 
     @NotNull
-    @DecimalMin("0.0")
+    @DecimalMin(value = "0.0", inclusive = false)
+    @Digits(integer = 10, fraction = 2)
     private BigDecimal packagePrice;
 
     @NotNull
     @DecimalMin("0.0")
+    @Digits(integer = 10, fraction = 2)
     private BigDecimal extraDoctorPrice;
 
+    @Size(max = 2000)
     private String features;
 
     private boolean active = true;

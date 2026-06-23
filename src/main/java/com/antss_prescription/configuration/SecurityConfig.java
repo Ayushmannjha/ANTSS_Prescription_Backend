@@ -51,8 +51,6 @@ public class SecurityConfig {
                                 "/v3/api-docs/**"
                         ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/user/subscriptions/**").hasRole("ADMIN")
-                        
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())

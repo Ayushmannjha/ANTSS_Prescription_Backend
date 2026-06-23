@@ -12,8 +12,10 @@ import com.antss_prescription.repository.LoginCredentialRepository;
 import com.antss_prescription.repository.RmoRepository;
 import com.antss_prescription.repository.UserSubscriptionRepository;
 import com.antss_prescription.repository.UserRepository;
+import com.antss_prescription.repository.LoginSessionRepository;
 import com.antss_prescription.service.RmoService;
 import com.antss_prescription.service.EmailService;
+import com.antss_prescription.security.PasswordResetTokenService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -39,9 +41,11 @@ public class RmoServiceImpl implements RmoService {
     private final UserRepository userRepository;
     private final UserSubscriptionRepository userSubscriptionRepository;
     private final LoginCredentialRepository loginCredentialRepository;
+    private final LoginSessionRepository loginSessionRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final ModelMapper modelMapper;
+    private final PasswordResetTokenService passwordResetTokenService;
 
     @Override
     public RmoResponse addRmo(CreateRmoRequest request, UUID userId) {
@@ -78,6 +82,7 @@ public class RmoServiceImpl implements RmoService {
                 }
             }
             rmo.setHospital(hospital);
+            rmo.setClinic(null);
             owner = hospital.getOwner() != null ? hospital.getOwner() : hospital.getUser();
         } else {
             Clinic clinic;
@@ -97,14 +102,16 @@ public class RmoServiceImpl implements RmoService {
                 }
             }
             rmo.setClinic(clinic);
+            rmo.setHospital(null);
             owner = clinic.getOwner() != null ? clinic.getOwner() : clinic.getUser();
         }
 
-        List<UserSubscription> activeSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(
-                owner.getId(), SubscriptionStatus.ACTIVE);
-        java.time.LocalDate subEndDate = activeSubs.isEmpty()
-                ? java.time.LocalDate.now().plusYears(1)
-                : activeSubs.get(0).getEndDate();
+        List<UserSubscription> activeSubs = userSubscriptionRepository.findValidByUserId(
+                owner.getId(), java.time.LocalDate.now());
+        if (activeSubs.isEmpty()) {
+            throw new BusinessException("An active paid subscription is required to add an RMO");
+        }
+        java.time.LocalDate subEndDate = activeSubs.get(0).getEndDate();
 
         String plainPassword = generateSecurePassword(12);
         User rmoUser = new User();
@@ -130,7 +137,6 @@ public class RmoServiceImpl implements RmoService {
                 request.getEmail(),
                 request.getRmoName(),
                 request.getEmail(),
-                plainPassword,
                 "RMO",
                 subEndDate
         );
@@ -162,6 +168,11 @@ public class RmoServiceImpl implements RmoService {
         if (rmo.getUser() != null) {
             rmo.getUser().setStatus(RegistrationStatus.INACTIVE);
             userRepository.save(rmo.getUser());
+            loginCredentialRepository.findByUserId(rmo.getUser().getId()).ifPresent(credential -> {
+                credential.setLoginStatus(LoginStatus.BLOCKED);
+                loginCredentialRepository.save(credential);
+            });
+            loginSessionRepository.expireAllSessionsForUser(rmo.getUser());
         }
         rmoRepository.save(rmo);
         log.info("Rmo marked inactive: {}", rmo.getRmoName());
@@ -255,6 +266,7 @@ public class RmoServiceImpl implements RmoService {
         }
         return response;
     }
+
 
     private String generateSecurePassword(int length) {
         final String CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$!";

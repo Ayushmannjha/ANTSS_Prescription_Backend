@@ -15,6 +15,11 @@ import com.antss_prescription.entity.prescription.PatientRegistration;
 import com.antss_prescription.exception.DuplicateRegistrationException;
 import com.antss_prescription.repository.prescription.PatientRegistrationRepo;
 import com.antss_prescription.repository.prescription.PatientRepo;
+import com.antss_prescription.repository.prescription.ConsultationRepo;
+import com.antss_prescription.exception.ConflictException;
+import com.antss_prescription.repository.ClinicRepository;
+import com.antss_prescription.repository.HospitalRepository;
+import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.service.PatientRegistrationService;
 
 import jakarta.transaction.Transactional;
@@ -26,10 +31,16 @@ public class PatientRegistrationServiceImpl
 
     private final PatientRegistrationRepo registrationRepo;
     private final PatientRepo patientRepository;
+    private final ClinicRepository clinicRepository;
+    private final HospitalRepository hospitalRepository;
+    private final AccessControlService accessControl;
+    private final ConsultationRepo consultationRepository;
 
     @Override
     @Transactional
     public PatientRegistration saveRegistration(PatientRegistration registration) {
+
+        resolveAndAuthorizeFacility(registration);
 
         // Handle Patient — create if not exists, reuse if exists
         if (registration.getPatient() != null) {
@@ -112,7 +123,7 @@ public class PatientRegistrationServiceImpl
 
         // Step 4 — Get next sequence number for this prefix + financial year
         String prefixWithYear = prefix + financialYear;
-        int nextNumber = getNextSequenceNumber(prefixWithYear);
+        long nextNumber = registrationRepo.nextRegistrationSequenceValue();
 
         return prefixWithYear + "/" + nextNumber;
     }
@@ -221,34 +232,6 @@ public class PatientRegistrationServiceImpl
         return start + end;
     }
 
-    private int getNextSequenceNumber(String prefixWithYear) {
-        List<PatientRegistration> existing = registrationRepo
-                .findByRegistrationNumberStartingWith(prefixWithYear + "/");
-
-        if (existing.isEmpty()) {
-            return 1;
-        }
-
-        // Extract the sequence numbers and find max
-        int max = 0;
-        for (PatientRegistration reg : existing) {
-            try {
-                String regNumber = reg.getRegistrationNumber();
-                String[] parts = regNumber.split("/");
-                if (parts.length == 2) {
-                    int seq = Integer.parseInt(parts[1]);
-                    if (seq > max) {
-                        max = seq;
-                    }
-                }
-            } catch (NumberFormatException e) {
-                // skip malformed numbers
-            }
-        }
-
-        return max + 1;
-    }
-    
     @Override
     public PatientRegistrationResponse getRegistrationById(Integer registrationId) {
 
@@ -256,6 +239,7 @@ public class PatientRegistrationServiceImpl
                 .orElseThrow(() -> new RuntimeException(
                         "Registration not found with id : " + registrationId));
 
+        accessControl.requireRegistrationAccess(reg);
         PatientRegistrationResponse response = new PatientRegistrationResponse();
         response.setRegistrationId(reg.getRegistrationId());
         response.setRegistrationNumber(reg.getRegistrationNumber());
@@ -275,7 +259,11 @@ public class PatientRegistrationServiceImpl
     }
     @Override
     public List<PatientRegistrationResponse> getAllRegistrations() {
-        return registrationRepo.findAll()
+        var scope = accessControl.currentClinicalScope();
+        List<PatientRegistration> registrations = scope.admin()
+                ? registrationRepo.findAll()
+                : registrationRepo.findAccessible(scope.hospitalIds(), scope.clinicIds());
+        return registrations
                 .stream()
                 .map(reg -> {
                     PatientRegistrationResponse response = new PatientRegistrationResponse();
@@ -307,7 +295,8 @@ public class PatientRegistrationServiceImpl
                 .orElseThrow(() -> new RuntimeException(
                         "Registration not found with id : " + registrationId));
 
-        existing.setRegistrationNumber(registration.getRegistrationNumber());
+        accessControl.requireRegistrationAccess(existing);
+        resolveAndAuthorizeFacility(registration);
         existing.setPatient(registration.getPatient());
         existing.setClinic(registration.getClinic());
         existing.setHospital(registration.getHospital());
@@ -343,13 +332,20 @@ public class PatientRegistrationServiceImpl
                                 "Registration not found with id : "
                                         + registrationId));
 
+        accessControl.requireRegistrationAccess(registration);
+        if (consultationRepository.existsByPatientRegistration(registration)) {
+            throw new ConflictException("Registration cannot be deleted while consultations exist");
+        }
         registrationRepo.delete(registration);
     }
 
 	
     @Override
     public List<PatientRegistrationResponse> getAllRegistrationsByClinic(Clinic clinic) {
-        return registrationRepo.findByClinic(clinic)
+        Clinic managedClinic = clinicRepository.findById(clinic.getId())
+                .orElseThrow(() -> new RuntimeException("Clinic not found: " + clinic.getId()));
+        accessControl.requireFacilityAccess(managedClinic);
+        return registrationRepo.findByClinic(managedClinic)
                 .stream()
                 .map(reg -> {
                     PatientRegistrationResponse response = new PatientRegistrationResponse();
@@ -365,7 +361,10 @@ public class PatientRegistrationServiceImpl
 
     @Override
     public List<PatientRegistrationResponse> getAllRegistrationsByHospital(Hospital hospital) {
-        return registrationRepo.findByHospital(hospital)
+        Hospital managedHospital = hospitalRepository.findById(hospital.getId())
+                .orElseThrow(() -> new RuntimeException("Hospital not found: " + hospital.getId()));
+        accessControl.requireFacilityAccess(managedHospital);
+        return registrationRepo.findByHospital(managedHospital)
                 .stream()
                 .map(reg -> {
                     PatientRegistrationResponse response = new PatientRegistrationResponse();
@@ -377,5 +376,26 @@ public class PatientRegistrationServiceImpl
                     return response;
                 })
                 .collect(Collectors.toList());
+    }
+
+    private void resolveAndAuthorizeFacility(PatientRegistration registration) {
+        boolean hasClinic = registration.getClinic() != null && registration.getClinic().getId() != null;
+        boolean hasHospital = registration.getHospital() != null && registration.getHospital().getId() != null;
+        if (hasClinic == hasHospital) {
+            throw new IllegalArgumentException("Exactly one clinic or hospital is required");
+        }
+        if (hasClinic) {
+            Clinic clinic = clinicRepository.findById(registration.getClinic().getId())
+                    .orElseThrow(() -> new RuntimeException("Clinic not found: " + registration.getClinic().getId()));
+            accessControl.requireFacilityAccess(clinic);
+            registration.setClinic(clinic);
+            registration.setHospital(null);
+        } else {
+            Hospital hospital = hospitalRepository.findById(registration.getHospital().getId())
+                    .orElseThrow(() -> new RuntimeException("Hospital not found: " + registration.getHospital().getId()));
+            accessControl.requireFacilityAccess(hospital);
+            registration.setHospital(hospital);
+            registration.setClinic(null);
+        }
     }
 }

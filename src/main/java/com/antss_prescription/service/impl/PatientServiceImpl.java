@@ -9,6 +9,10 @@ import org.springframework.stereotype.Service;
 
 import com.antss_prescription.entity.prescription.Patient;
 import com.antss_prescription.repository.prescription.PatientRepo;
+import com.antss_prescription.repository.prescription.PatientRegistrationRepo;
+import com.antss_prescription.repository.prescription.DocumentRepo;
+import com.antss_prescription.exception.ConflictException;
+import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.service.PatientService;
 
 @Service
@@ -16,6 +20,9 @@ import com.antss_prescription.service.PatientService;
 public class PatientServiceImpl implements PatientService {
 
     private final PatientRepo patientRepo;
+    private final AccessControlService accessControl;
+    private final PatientRegistrationRepo registrationRepository;
+    private final DocumentRepo documentRepository;
 
     @Override
     public Patient savePatient(Patient patient) {
@@ -29,14 +36,18 @@ public class PatientServiceImpl implements PatientService {
     @Override
     public Patient getPatientById(Integer patientId) {
 
-        return patientRepo.findById(patientId)
+        Patient patient = patientRepo.findById(patientId)
                 .orElseThrow(() -> new RuntimeException("Patient not found with id : " + patientId));
+        accessControl.requirePatientAccess(patient);
+        return patient;
     }
 
     @Override
     public List<Patient> getAllPatients() {
 
-        return patientRepo.findAll();
+        var scope = accessControl.currentClinicalScope();
+        return scope.admin() ? patientRepo.findAll()
+                : patientRepo.findAccessible(scope.hospitalIds(), scope.clinicIds());
     }
 
     @Override
@@ -44,6 +55,8 @@ public class PatientServiceImpl implements PatientService {
 
         Patient existingPatient = patientRepo.findById(patientId)
                 .orElseThrow(() -> new RuntimeException("Patient not found with id : " + patientId));
+
+        accessControl.requirePatientAccess(existingPatient);
 
         existingPatient.setPatientName(patient.getPatientName());
         existingPatient.setMobileNumber(patient.getMobileNumber());
@@ -65,6 +78,15 @@ public class PatientServiceImpl implements PatientService {
 
         Patient patient = patientRepo.findById(patientId)
                 .orElseThrow(() -> new RuntimeException("Patient not found with id : " + patientId));
+
+        accessControl.requirePatientAccess(patient);
+
+        if (registrationRepository.existsByPatient(patient)) {
+            throw new ConflictException("Patient cannot be deleted while registrations exist");
+        }
+        if (documentRepository.existsByPatientPatientId(patientId)) {
+            throw new ConflictException("Patient cannot be deleted while documents exist");
+        }
 
         patientRepo.delete(patient);
     }

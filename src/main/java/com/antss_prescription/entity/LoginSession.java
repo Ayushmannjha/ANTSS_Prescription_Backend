@@ -17,10 +17,10 @@ public class LoginSession {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, length = 2000)
+    @Column(nullable = false, unique = true, length = 2000)
     private String token;
 
-    @Column(length = 2000)
+    @Column(unique = true, length = 2000)
     private String refreshToken;
 
     private String deviceInfo;

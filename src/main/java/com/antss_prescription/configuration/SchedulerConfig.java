@@ -2,12 +2,10 @@ package com.antss_prescription.configuration;
 
 import com.antss_prescription.entity.User;
 import com.antss_prescription.entity.UserSubscription;
-import com.antss_prescription.enums.RegistrationStatus;
 import com.antss_prescription.enums.SubscriptionStatus;
-import com.antss_prescription.repository.LoginSessionRepository;
-import com.antss_prescription.repository.UserRepository;
 import com.antss_prescription.repository.UserSubscriptionRepository;
 import com.antss_prescription.service.EmailService;
+import com.antss_prescription.service.impl.LinkedAccountStatusService;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -22,19 +20,16 @@ import java.util.List;
 @EnableScheduling
 public class SchedulerConfig {
 
-    private final UserRepository userRepository;
     private final UserSubscriptionRepository userSubscriptionRepository;
-    private final LoginSessionRepository loginSessionRepository;
     private final EmailService emailService;
+    private final LinkedAccountStatusService linkedAccountStatusService;
 
-    public SchedulerConfig(UserRepository userRepository,
-                           UserSubscriptionRepository userSubscriptionRepository,
-                           LoginSessionRepository loginSessionRepository,
-                           EmailService emailService) {
-        this.userRepository = userRepository;
+    public SchedulerConfig(UserSubscriptionRepository userSubscriptionRepository,
+                           EmailService emailService,
+                           LinkedAccountStatusService linkedAccountStatusService) {
         this.userSubscriptionRepository = userSubscriptionRepository;
-        this.loginSessionRepository = loginSessionRepository;
         this.emailService = emailService;
+        this.linkedAccountStatusService = linkedAccountStatusService;
     }
 
     @Scheduled(cron = "0 0 0 * * ?") // Runs daily at midnight
@@ -57,11 +52,7 @@ public class SchedulerConfig {
                 List<UserSubscription> userActiveSubs = userSubscriptionRepository.findByUserIdAndSubscriptionStatus(user.getId(), SubscriptionStatus.ACTIVE);
                 
                 if (userActiveSubs.isEmpty()) {
-                    user.setStatus(RegistrationStatus.EXPIRED);
-                    userRepository.save(user);
-
-                    // Invalidate all active sessions
-                    loginSessionRepository.expireAllSessionsForUser(user);
+                    linkedAccountStatusService.expireOwnerAndLinkedAccounts(user);
 
                     // Send expiry email
                     emailService.sendExpiryReminderEmail(user.getEmail(), user.getFullName());

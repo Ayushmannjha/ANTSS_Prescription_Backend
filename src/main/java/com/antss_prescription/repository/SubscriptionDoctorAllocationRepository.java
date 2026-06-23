@@ -16,8 +16,6 @@ import com.antss_prescription.enums.AllocationStatus;
 
 @Repository
 public interface SubscriptionDoctorAllocationRepository extends JpaRepository<SubscriptionDoctorAllocation, Long> {
-    List<SubscriptionDoctorAllocation> findByUserSubscriptionAndStatus(UserSubscription subscription, AllocationStatus status);
-    List<SubscriptionDoctorAllocation> findByUserSubscriptionIdAndStatus(UUID subscriptionId, AllocationStatus status);
     Optional<SubscriptionDoctorAllocation> findByUserSubscriptionIdAndDoctorIdAndStatus(UUID subscriptionId, UUID doctorId, AllocationStatus status);
     List<SubscriptionDoctorAllocation> findByDoctorAndStatus(Doctor doctor, AllocationStatus status);
     
@@ -40,4 +38,5 @@ public interface SubscriptionDoctorAllocationRepository extends JpaRepository<Su
     List<SubscriptionDoctorAllocation> findAllBySubscriptionId(@Param("subscriptionId") UUID subscriptionId);
 
     long countByStatus(AllocationStatus status);
+    long countByUserSubscriptionIdAndStatus(UUID subscriptionId, AllocationStatus status);
 }

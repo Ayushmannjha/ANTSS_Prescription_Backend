@@ -6,9 +6,11 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import org.hibernate.annotations.Check;
 
 @Entity
 @Data
+@Check(constraints = "(hospital_id IS NOT NULL AND clinic_id IS NULL) OR (hospital_id IS NULL AND clinic_id IS NOT NULL)")
 public class Rmo {
 
     @Id

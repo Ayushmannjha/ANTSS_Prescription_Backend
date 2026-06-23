@@ -13,7 +13,7 @@ import com.antss_prescription.entity.prescription.Document;
 
 import jakarta.transaction.Transactional;
 @Repository
-public interface DocumentRepo extends JpaRepository<Document, Long> {
+public interface DocumentRepo extends JpaRepository<Document, Integer> {
 
     @Query("SELECT d FROM Document d WHERE d.patient.patientId = :patientId")
     List<Document> findByPatientId(@Param("patientId") Integer patientId);
@@ -21,14 +21,9 @@ public interface DocumentRepo extends JpaRepository<Document, Long> {
     @Query("SELECT d FROM Document d WHERE d.id = :documentId AND d.patient.patientId = :patientId")
     Optional<Document> findByIdAndPatientId(@Param("documentId") Integer documentId, @Param("patientId") Integer patientId);
 
-    @Query("DELETE FROM Document d WHERE d.id = :documentId AND d.patient.patientId = :patientId")
-    @Modifying
-    @Transactional
-    void deleteByIdAndPatientId(@Param("documentId") Integer documentId, @Param("patientId") Integer patientId);
-
 	void deleteByPatientPatientId(int patientId);
 
 	List<Document> findByPatientPatientId(int patientId);
+	boolean existsByPatientPatientId(int patientId);
 
-    Optional<Document> findByUrl(String url);
 }

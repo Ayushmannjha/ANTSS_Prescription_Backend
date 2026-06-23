@@ -2,8 +2,8 @@ package com.antss_prescription.controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,12 +15,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.antss_prescription.dto.response.PatientRegistrationResponse;
+import com.antss_prescription.dto.request.PatientRegistrationRequest;
+import com.antss_prescription.dto.request.ClinicalRequestMapper;
 import com.antss_prescription.entity.Clinic;
 import com.antss_prescription.entity.Hospital;
 import com.antss_prescription.entity.prescription.PatientRegistration;
 import com.antss_prescription.repository.ClinicRepository;
 import com.antss_prescription.repository.HospitalRepository;
 import com.antss_prescription.service.PatientRegistrationService;
+import com.antss_prescription.exception.ResourceNotFoundException;
 
 @RestController
 @RequestMapping("/api/patient-registrations")
@@ -34,13 +37,28 @@ public class PatientRegistrationController {
 
     // Create Registration
     @PostMapping
-    public ResponseEntity<PatientRegistration> saveRegistration(
-            @RequestBody PatientRegistration registration) {
+    public ResponseEntity<PatientRegistrationResponse> saveRegistration(
+            @Valid @RequestBody PatientRegistrationRequest request) {
 
         PatientRegistration savedRegistration =
-                patientRegistrationService.saveRegistration(registration);
+                patientRegistrationService.saveRegistration(ClinicalRequestMapper.toRegistration(request));
 
-        return ResponseEntity.ok(savedRegistration);
+        PatientRegistrationResponse response = new PatientRegistrationResponse();
+        response.setRegistrationId(savedRegistration.getRegistrationId());
+        response.setRegistrationNumber(savedRegistration.getRegistrationNumber());
+        response.setPatient(savedRegistration.getPatient());
+
+        if (savedRegistration.getClinic() != null) {
+            response.setClinicId(savedRegistration.getClinic().getId());
+            response.setClinicName(savedRegistration.getClinic().getClinicName());
+        }
+
+        if (savedRegistration.getHospital() != null) {
+            response.setHospitalId(savedRegistration.getHospital().getId());
+            response.setHospitalName(savedRegistration.getHospital().getHospitalName());
+        }
+
+        return ResponseEntity.ok(response);
     }
 
     // Get Registration By Id
@@ -66,26 +84,28 @@ public class PatientRegistrationController {
     @GetMapping("/clinic/{clinicId}")
     public ResponseEntity<List<PatientRegistrationResponse>> getByClinic(
             @PathVariable Long clinicId) {
-        Clinic clinic = clinicRepository.findById(clinicId).get();
+        Clinic clinic = clinicRepository.findById(clinicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Clinic", clinicId));
         return ResponseEntity.ok(patientRegistrationService.getAllRegistrationsByClinic(clinic));
     }
 
     @GetMapping("/hospital/{hospitalId}")
     public ResponseEntity<List<PatientRegistrationResponse>> getByHospital(
             @PathVariable Long hospitalId) {
-        Hospital hospital = hospitalRepository.findById(hospitalId).get();
+        Hospital hospital = hospitalRepository.findById(hospitalId)
+                .orElseThrow(() -> new ResourceNotFoundException("Hospital", hospitalId));
         return ResponseEntity.ok(patientRegistrationService.getAllRegistrationsByHospital(hospital));
     }
     // Update Registration
     @PutMapping("/{registrationId}")
     public ResponseEntity<PatientRegistrationResponse> updateRegistration(
             @PathVariable Integer registrationId,
-            @RequestBody PatientRegistration registration) {
+            @Valid @RequestBody PatientRegistrationRequest request) {
     	
     	PatientRegistrationResponse updatedRegistration =
                 patientRegistrationService.updateRegistration(
                         registrationId,
-                        registration);
+                        ClinicalRequestMapper.toRegistration(request));
 
         return ResponseEntity.ok(updatedRegistration);
     }

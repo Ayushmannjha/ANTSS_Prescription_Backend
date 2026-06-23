@@ -5,6 +5,8 @@ import com.antss_prescription.entity.User;
 import com.antss_prescription.exception.BusinessException;
 import com.antss_prescription.repository.LoginCredentialRepository;
 import com.antss_prescription.repository.UserRepository;
+import com.antss_prescription.enums.LoginStatus;
+import com.antss_prescription.enums.RegistrationStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -31,9 +33,16 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 () -> new BusinessException("no user credentials found")
         );
 
+        boolean enabled = user.getStatus() == RegistrationStatus.APPROVED
+                && credential.getLoginStatus() == LoginStatus.ACTIVE;
+
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(),
                 credential.getPasswordHash(),
+                enabled,
+                true,
+                true,
+                true,
                 List.of(new SimpleGrantedAuthority(user.getRole().name()))
         );
     }

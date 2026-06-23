@@ -14,7 +14,6 @@ import java.util.Optional;
 public interface LoginSessionRepository extends JpaRepository<LoginSession, Long> {
     Optional<LoginSession> findByTokenAndExpiredFalse(String token);
     Optional<LoginSession> findByRefreshTokenAndExpiredFalse(String refreshToken);
-    List<LoginSession> findByUserAndExpiredFalse(User user);
 
     @Modifying
     @Query("UPDATE LoginSession s SET s.expired = true WHERE s.user = :user")
