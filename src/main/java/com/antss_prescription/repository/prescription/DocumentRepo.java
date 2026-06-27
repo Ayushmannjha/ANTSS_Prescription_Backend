@@ -25,5 +25,6 @@ public interface DocumentRepo extends JpaRepository<Document, Integer> {
 
 	List<Document> findByPatientPatientId(int patientId);
 	boolean existsByPatientPatientId(int patientId);
+    Optional<Document> findByUrl(String url);
 
 }

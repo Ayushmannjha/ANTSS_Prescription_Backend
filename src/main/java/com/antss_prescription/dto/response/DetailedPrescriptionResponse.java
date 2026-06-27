@@ -51,6 +51,26 @@ public class DetailedPrescriptionResponse {
         private String url;
     }
 
+    @Data
+    @Builder
+    public static class InvestigationDetailResponse {
+        private int id;
+        private String investigationName;
+        private String notes;
+        private LocalDateTime createdAt;
+        private String documentUrl;
+        private String documentFileName;
+    }
+
+    @Data
+    @Builder
+    public static class TestRequestedDetailResponse {
+        private int id;
+        private String testName;
+        private String notes;
+        private LocalDateTime createdAt;
+    }
+
     // And the field
     private List<DocumentDetailResponse> documents;
 }

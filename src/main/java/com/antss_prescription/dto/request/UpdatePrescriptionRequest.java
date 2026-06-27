@@ -48,6 +48,12 @@ public class UpdatePrescriptionRequest {
     @Valid
     private List<SavePrescriptionRequest.DiagnosticRequest> diagnostics;
 
+    // --- Investigation ---
+    private List<SavePrescriptionRequest.InvestigationRequest> investigations;
+
+    // --- Test Requested ---
+    private List<SavePrescriptionRequest.TestRequestedRequest> testRequested;
+
     // --- Documents ---
     @Valid
     private List<SavePrescriptionRequest.DocumentRequest> documents;

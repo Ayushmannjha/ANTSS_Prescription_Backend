@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.antss_prescription.entity.prescription.*;
+import com.antss_prescription.repository.prescription.*;
 import org.springframework.stereotype.Service;
 
 import com.antss_prescription.dto.request.SavePrescriptionRequest;
@@ -13,31 +15,8 @@ import com.antss_prescription.dto.request.UpdatePrescriptionRequest;
 import com.antss_prescription.dto.response.ConsultationResponse;
 import com.antss_prescription.dto.response.DetailedPrescriptionResponse;
 import com.antss_prescription.dto.response.PrescriptionResponse;
-import com.antss_prescription.entity.prescription.CheifComplaints;
-import com.antss_prescription.entity.prescription.Consultation;
-import com.antss_prescription.entity.prescription.Diagnosis;
-import com.antss_prescription.entity.prescription.Document;
-import com.antss_prescription.entity.prescription.GeneralExamination;
-import com.antss_prescription.entity.prescription.DiagnosticOrder;
-import com.antss_prescription.entity.prescription.PastMedicalHistory;
-import com.antss_prescription.entity.prescription.Patient;
-import com.antss_prescription.entity.prescription.PatientRegistration;
-import com.antss_prescription.entity.prescription.Prescription;
-import com.antss_prescription.entity.prescription.PrescriptionMedicines;
 import com.antss_prescription.enums.DiagnosticStatus;
-import com.antss_prescription.entity.prescription.Vitals;
 import com.antss_prescription.entity.Doctor;
-import com.antss_prescription.repository.prescription.CheifComplaintsRepo;
-import com.antss_prescription.repository.prescription.ConsultationRepo;
-import com.antss_prescription.repository.prescription.DaignosisRepo;
-import com.antss_prescription.repository.prescription.DocumentRepo;
-import com.antss_prescription.repository.prescription.GeneralExaminationRepo;
-import com.antss_prescription.repository.prescription.DiagnosticOrderRepository;
-import com.antss_prescription.repository.prescription.PastMedicalHistoryRepo;
-import com.antss_prescription.repository.prescription.PatientRegistrationRepo;
-import com.antss_prescription.repository.prescription.PrescriptionMedicinesRepo;
-import com.antss_prescription.repository.prescription.PrescriptionRepo;
-import com.antss_prescription.repository.prescription.VitalsRepo;
 import com.antss_prescription.service.PrescriptionService;
 import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.exception.ForbiddenException;
@@ -58,6 +37,8 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     private final ConsultationRepo consultationRepository;
     private final PrescriptionRepo prescriptionRepository;
     private final PrescriptionMedicinesRepo prescriptionMedicinesRepository;
+    private final InvestigationsRepo investigationsRepo;
+    private final TestRequestedRepo testRequestedRepo;
     private final DiagnosticOrderRepository diagnosticOrderRepository;
     private final DocumentRepo documentRepo;
     private final AccessControlService accessControl;
@@ -280,6 +261,54 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                 diagnosticOrderRepository.save(order);
             }
         }
+// =========================
+        // Save Investigations
+        // =========================
+
+        if (req.getInvestigations() != null) {
+
+            for (SavePrescriptionRequest.InvestigationRequest i
+                    : req.getInvestigations()) {
+
+                Investigations investigation = new Investigations();
+                investigation.setInestigationName(i.getInvestigationName());
+                investigation.setNotes(i.getNotes());
+                investigation.setPrescription(prescription);
+                investigation.setPatientRegistration(
+                        consultation.getPatientRegistration());
+                investigation.setCreateAt(LocalDateTime.now());
+                investigation.setUpdatedAt(LocalDateTime.now());
+
+                if (i.getDocumentUrl() != null && !i.getDocumentUrl().isEmpty()) {
+                    documentRepo.findByUrl(i.getDocumentUrl())
+                            .ifPresent(investigation::setDocument);
+                }
+
+                investigationsRepo.save(investigation);
+            }
+        }
+
+        // =========================
+        // Save Test Requested
+        // =========================
+
+        if (req.getTestRequested() != null) {
+
+            for (SavePrescriptionRequest.TestRequestedRequest t
+                    : req.getTestRequested()) {
+
+                TestRequested testRequested = new TestRequested();
+                testRequested.setTestName(t.getTestName());
+                testRequested.setNotes(t.getNotes());
+                testRequested.setPrescription(prescription);
+                testRequested.setPatientRegistration(
+                        consultation.getPatientRegistration());
+                testRequested.setCreateAt(LocalDateTime.now());
+                testRequested.setUpdatedAt(LocalDateTime.now());
+                testRequestedRepo.save(testRequested);
+            }
+        }
+
 
 
 
@@ -578,10 +607,61 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
             diagnosticOrderRepository.save(order);
         }
     }
+       // =========================
+       // Replace Investigations
+       // =========================
+
+       investigationsRepo.deleteByPrescription(prescription);
+
+       if (req.getInvestigations() != null) {
+
+           for (SavePrescriptionRequest.InvestigationRequest i
+                   : req.getInvestigations()) {
+
+               Investigations investigation = new Investigations();
+               investigation.setInestigationName(i.getInvestigationName());
+               investigation.setNotes(i.getNotes());
+               investigation.setPrescription(prescription);
+               investigation.setPatientRegistration(
+                       consultation.getPatientRegistration());
+               investigation.setCreateAt(LocalDateTime.now());
+               investigation.setUpdatedAt(LocalDateTime.now());
+
+               if (i.getDocumentUrl() != null && !i.getDocumentUrl().isEmpty()) {
+                   documentRepo.findByUrl(i.getDocumentUrl())
+                           .ifPresent(investigation::setDocument);
+               }
+
+               investigationsRepo.save(investigation);
+           }
+       }
+
+       // =========================
+       // Replace Test Requested
+       // =========================
+
+       testRequestedRepo.deleteByPrescription(prescription);
+
+       if (req.getTestRequested() != null) {
+
+           for (SavePrescriptionRequest.TestRequestedRequest t
+                   : req.getTestRequested()) {
+
+               TestRequested testRequested = new TestRequested();
+               testRequested.setTestName(t.getTestName());
+               testRequested.setPrescription(prescription);
+               testRequested.setPatientRegistration(
+                       consultation.getPatientRegistration());
+               testRequested.setCreateAt(LocalDateTime.now());
+               testRequested.setUpdatedAt(LocalDateTime.now());
+               testRequestedRepo.save(testRequested);
+           }
+       }
 
 
 
-    // =========================
+
+       // =========================
     // Build Response
     // =========================
 
@@ -610,6 +690,8 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
 
         prescriptionMedicinesRepository.deleteByPrescription(prescription);
         diagnosticOrderRepository.deleteByPrescription(prescription);
+        investigationsRepo.deleteByPrescription(prescription);
+        testRequestedRepo.deleteByPrescription(prescription);
 
         // =========================
         // Delete Prescription
@@ -706,6 +788,20 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
 
         Consultation consultation = prescription.getConsultation();
         PatientRegistration registration = consultation.getPatientRegistration();
+
+        // =========================
+        // Fetch Investigations
+        // =========================
+
+        List<Investigations> investigations =
+                investigationsRepo.findByPrescription(prescription);
+
+        // =========================
+        // Fetch Test Requested
+        // =========================
+
+        List<TestRequested> testRequestedList =
+                testRequestedRepo.findByPrescription(prescription);
 
         // =========================
         // Fetch Medicines
@@ -916,6 +1012,36 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                                 .completedAt(item.getCompletedAt())
                                 .reportDocumentId(item.getReportDocument() == null
                                         ? null : item.getReportDocument().getId())
+                                .build())
+                        .collect(Collectors.toList());
+
+        List<DetailedPrescriptionResponse.InvestigationDetailResponse> investigationDetails =
+
+                investigations.stream()
+                        .map(i -> DetailedPrescriptionResponse.InvestigationDetailResponse
+                                .builder()
+                                .id(i.getId())
+                                .investigationName(i.getInestigationName())
+                                .notes(i.getNotes())
+                                .createdAt(i.getCreateAt())
+                                .documentUrl(i.getDocument() != null ? i.getDocument().getUrl() : null)
+                                .documentFileName(i.getDocument() != null ? i.getDocument().getFileName() : null)
+                                .build())
+                        .collect(Collectors.toList());
+
+        // =========================
+        // Test Requested
+        // =========================
+
+        List<DetailedPrescriptionResponse.TestRequestedDetailResponse> testRequestedDetails =
+
+                testRequestedList.stream()
+                        .map(t -> DetailedPrescriptionResponse.TestRequestedDetailResponse
+                                .builder()
+                                .id(t.getId())
+                                .testName(t.getTestName())
+                                .notes(t.getNotes())
+                                .createdAt(t.getCreateAt())
                                 .build())
                         .collect(Collectors.toList());
 

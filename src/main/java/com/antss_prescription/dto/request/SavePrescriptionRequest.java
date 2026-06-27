@@ -48,6 +48,11 @@ public class SavePrescriptionRequest {
     // --- Diagnostic orders ---
     private List<@Valid DiagnosticRequest> diagnostics;
 
+    private List<@Valid InvestigationRequest> investigations;
+
+    // --- Test Requested ---
+    private List<@Valid TestRequestedRequest> testRequested;
+
     // --- Consultation ---
     @Positive
     private int registrationId;
@@ -62,6 +67,7 @@ public class SavePrescriptionRequest {
 
     // --- Medicines ---
     private List<@Valid MedicineRequest> medicines;
+
 
     // =========================
     // Chief Complaint
@@ -132,6 +138,27 @@ public class SavePrescriptionRequest {
         @Size(max = 255)
         private String testName;
         @Size(max = 1000)
+        private String notes;
+    }
+    // =========================
+    // Investigation
+    // =========================
+
+    @Data
+    public static class InvestigationRequest {
+        private String investigationName;
+        private String notes;
+        private String documentUrl;
+        private String documentFileName;
+    }
+
+    // =========================
+    // Test Requested
+    // =========================
+
+    @Data
+    public static class TestRequestedRequest {
+        private String testName;
         private String notes;
     }
 
