@@ -1015,6 +1015,8 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                                 .build())
                         .collect(Collectors.toList());
 
+        // Investigations
+
         List<DetailedPrescriptionResponse.InvestigationDetailResponse> investigationDetails =
 
                 investigations.stream()
@@ -1070,6 +1072,8 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                 .createdAt(prescription.getCreatedAt())
                 .consultation(consultationResponse)
                 .medicines(medicineDetails)
+                .investigations(investigationDetails)
+                .testRequested(testRequestedDetails)
                 .diagnostics(diagnosticDetails)
                 .documents(documentDetails)
                 .build();
