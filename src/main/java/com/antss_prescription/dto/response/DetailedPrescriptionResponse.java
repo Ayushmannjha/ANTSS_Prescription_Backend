@@ -31,6 +31,9 @@ public class DetailedPrescriptionResponse {
  // In DetailedPrescriptionResponse.java — add these fields
     private List<DiagnosticDetailResponse> diagnostics;
 
+    private List<InvestigationDetailResponse> investigations;
+    private List<TestRequestedDetailResponse> testRequested;
+
     @Data
     @Builder
     public static class DiagnosticDetailResponse {
