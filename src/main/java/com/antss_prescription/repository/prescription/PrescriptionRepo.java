@@ -1,5 +1,6 @@
 package com.antss_prescription.repository.prescription;
 
+import com.antss_prescription.entity.prescription.Document;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.antss_prescription.entity.prescription.PatientRegistration;

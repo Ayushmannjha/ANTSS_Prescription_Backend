@@ -12,13 +12,13 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/patients/{patientId}/documents")
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class DocumentController {
 
     private final DocumentService documentService;
 
-    @PostMapping
+    @PostMapping("/patients/{patientId}/documents")
     public ResponseEntity<DocumentDto> uploadDocument(
             @PathVariable Integer patientId,
             @RequestParam("file") MultipartFile file,
@@ -29,21 +29,28 @@ public class DocumentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(document);
     }
 
-    @GetMapping
+    @GetMapping("/patients/{patientId}/documents")
     public ResponseEntity<List<DocumentDto>> getPatientDocuments(@PathVariable Integer patientId) {
 
         List<DocumentDto> documents = documentService.getPatientDocuments(patientId);
         return ResponseEntity.ok(documents);
     }
 
-    @GetMapping("/{documentId}")
+    @GetMapping("/patients/{patientId}/documents/{documentId}")
     public ResponseEntity<DocumentDto> getDocument(@PathVariable Integer patientId, @PathVariable Integer documentId) {
 
         DocumentDto document = documentService.getDocument(patientId, documentId);
         return ResponseEntity.ok(document);
     }
 
-    @DeleteMapping("/{documentId}")
+    @GetMapping("/prescription/{prescriptionId}/documents")
+    public ResponseEntity<List<DocumentDto>> getDocumentsByPrescription(
+            @PathVariable Integer prescriptionId) {
+
+        return ResponseEntity.ok(documentService.getDocumentsByPrescription(prescriptionId));
+    }
+
+    @DeleteMapping("/patients/{patientId}/documents/{documentId}")
     public ResponseEntity<Void> deleteDocument(@PathVariable Integer patientId, @PathVariable Integer documentId) {
 
         documentService.deleteDocument(patientId, documentId);
