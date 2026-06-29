@@ -13,7 +13,10 @@ import jakarta.validation.constraints.Size;
 import lombok.*;
 
 @Entity
-@Table(name="Patient")
+@Table(
+		name = "Patient",
+		uniqueConstraints = @UniqueConstraint(name = "uk_patient_mobile_number", columnNames = "mobile_number")
+)
 @Setter
 @Getter
 @ToString
@@ -27,7 +30,9 @@ public class Patient {
 	@NotBlank
 	@Size(max = 100)
 	private String patientName;
-	@Pattern(regexp = "^$|^[6-9][0-9]{9}$", message = "must be a valid 10-digit mobile number")
+	@Column(name = "mobile_number", nullable = false, unique = true, length = 10)
+	@NotBlank
+	@Pattern(regexp = "^[6-9][0-9]{9}$", message = "must be a valid 10-digit mobile number")
 	private String mobileNumber;
 	@NotBlank
 	@Size(max = 20)

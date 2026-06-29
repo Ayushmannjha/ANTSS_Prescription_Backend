@@ -160,6 +160,8 @@ public class SavePrescriptionRequest {
     public static class TestRequestedRequest {
         private String testName;
         private String notes;
+        private String documentUrl;
+        private String documentFileName;
     }
 
     // =========================

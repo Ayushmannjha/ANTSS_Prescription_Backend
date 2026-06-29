@@ -1,181 +1,182 @@
 package com.antss_prescription.service.impl;
 
+import com.antss_prescription.docs.service.CloudinaryService;
+import com.antss_prescription.docs.service.CloudinaryService.UploadResult;
+import com.antss_prescription.dto.request.InvestigationUploadRequest;
+import com.antss_prescription.dto.response.InvestigationResponse;
+import com.antss_prescription.entity.prescription.Document;
 import com.antss_prescription.entity.prescription.Investigations;
+import com.antss_prescription.entity.prescription.PatientRegistration;
 import com.antss_prescription.entity.prescription.Prescription;
+import com.antss_prescription.exception.BusinessException;
+import com.antss_prescription.exception.ResourceNotFoundException;
+import com.antss_prescription.repository.prescription.DocumentRepo;
 import com.antss_prescription.repository.prescription.InvestigationsRepo;
+import com.antss_prescription.repository.prescription.PatientRegistrationRepo;
 import com.antss_prescription.repository.prescription.PrescriptionRepo;
+import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.service.InvestigationsService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.AuthenticationProvider;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
+@Transactional
 public class InvestigationsServiceImpl implements InvestigationsService {
 
-    private final AuthenticationProvider authenticationProvider;
-
-    private InvestigationsRepo investigationsRepo;
-    private PrescriptionRepo prescriptionRepo;
+    private final InvestigationsRepo investigationsRepo;
+    private final PrescriptionRepo prescriptionRepo;
+    private final PatientRegistrationRepo registrationRepo;
+    private final DocumentRepo documentRepo;
+    private final CloudinaryService cloudinaryService;
+    private final AccessControlService accessControl;
 
     @Override
     public Investigations save(Investigations investigations) {
+        LocalDateTime now = LocalDateTime.now();
+        if (investigations.getId() == 0) {
+            investigations.setCreateAt(now);
+        }
+        investigations.setUpdatedAt(now);
+        return investigationsRepo.save(investigations);
+    }
 
+    @Override
+    public InvestigationResponse saveWithDocument(InvestigationUploadRequest request, MultipartFile documentFile) {
+        requireDocument(documentFile);
+        UploadResult uploaded = null;
         try {
+            ClinicalContext context = resolveContext(request.getRegistrationId(), request.getPrescriptionId());
+            accessControl.requireRegistrationAccess(context.registration());
 
-            System.out.println(
-                    "==== SAVING INVESTIGATION STARTED ====");
+            uploaded = cloudinaryService.uploadFile(documentFile);
+            Document document = Document.builder()
+                    .fileName(documentFile.getOriginalFilename())
+                    .url(uploaded.url())
+                    .documentType("INVESTIGATION")
+                    .cloudinaryPublicId(uploaded.publicId())
+                    .cloudinaryResourceType(uploaded.resourceType())
+                    .patient(context.registration().getPatient())
+                    .prescription(context.prescription())
+                    .build();
+            Document savedDocument = documentRepo.saveAndFlush(document);
 
-            if (investigations.getId() == 0) {
+            LocalDateTime now = LocalDateTime.now();
+            Investigations investigation = new Investigations();
+            investigation.setInestigationName(request.getInvestigationName());
+            investigation.setNotes(request.getNotes());
+            investigation.setPatientRegistration(context.registration());
+            investigation.setPrescription(context.prescription());
+            investigation.setDocument(savedDocument);
+            investigation.setCreateAt(now);
+            investigation.setUpdatedAt(now);
 
-                investigations.setCreateAt(
-                        LocalDateTime.now());
+            return toResponse(investigationsRepo.save(investigation));
+        } catch (RuntimeException | IOException ex) {
+            if (uploaded != null) {
+                cleanupUpload(uploaded);
             }
-
-            investigations.setUpdatedAt(
-                    LocalDateTime.now());
-
-            Investigations saved =
-                    investigationsRepo.save(
-                            investigations);
-
-            System.out.println(
-                    "==== INVESTIGATION SAVED : "
-                            + saved.getId()
-                            + " ====");
-
-            return saved;
-
-        } catch (Exception ex) {
-
-            ex.printStackTrace();
-
-            throw new RuntimeException(
-                    "Failed To Save Investigation : "
-                            + ex.getMessage());
+            if (ex instanceof BusinessException || ex instanceof ResourceNotFoundException) {
+                throw (RuntimeException) ex;
+            }
+            log.error("Failed to save investigation with document", ex);
+            throw new BusinessException("Unable to save investigation document at this time");
         }
     }
-
-    // =========================
-    // Get By Registration Number
-    // =========================
 
     @Override
-    public List<Investigations> getByRegistrationNumber(
-            String registrationNumber) {
-
-        try {
-
-            System.out.println(
-                    "==== FETCHING INVESTIGATIONS BY REGISTRATION NUMBER : "
-                            + registrationNumber
-                            + " ====");
-
-            List<Investigations> list =
-
-                    investigationsRepo
-                            .findByPatientRegistrationRegistrationNumber(
-                                    registrationNumber);
-
-            System.out.println(
-                    "==== INVESTIGATIONS FOUND : "
-                            + list.size()
-                            + " ====");
-
-            return list;
-
-        } catch (Exception ex) {
-
-            ex.printStackTrace();
-
-            throw new RuntimeException(
-                    "Failed To Fetch Investigations : "
-                            + ex.getMessage());
-        }
+    @Transactional(readOnly = true)
+    public List<Investigations> getByRegistrationNumber(String registrationNumber) {
+        return investigationsRepo.findByPatientRegistrationRegistrationNumber(registrationNumber);
     }
-
-    // =========================
-    // Get By Document ID
-    // =========================
 
     @Override
-    public List<Investigations> getByDocumentId(
-            Integer documentId) {
-
-        try {
-
-            System.out.println(
-                    "==== FETCHING INVESTIGATIONS BY DOCUMENT ID : "
-                            + documentId
-                            + " ====");
-
-            List<Investigations> list =
-
-                    investigationsRepo
-                            .findByDocumentId(
-                                    documentId);
-
-            System.out.println(
-                    "==== INVESTIGATIONS FOUND : "
-                            + list.size()
-                            + " ====");
-
-            return list;
-
-        } catch (Exception ex) {
-
-            ex.printStackTrace();
-
-            throw new RuntimeException(
-                    "Failed To Fetch Investigations By Document : "
-                            + ex.getMessage());
-        }
+    @Transactional(readOnly = true)
+    public List<Investigations> getByDocumentId(Integer documentId) {
+        return investigationsRepo.findByDocumentId(documentId);
     }
-
-    // =========================
-    // Delete By ID
-    // =========================
 
     @Override
     public void deleteById(Integer id) {
-
-        try {
-
-            System.out.println(
-                    "==== DELETING INVESTIGATION : "
-                            + id
-                            + " ====");
-
-            investigationsRepo.deleteById(id);
-
-            System.out.println(
-                    "==== INVESTIGATION DELETED ====");
-
-        } catch (Exception ex) {
-
-            ex.printStackTrace();
-
-            throw new RuntimeException(
-                    "Failed To Delete Investigation : "
-                            + ex.getMessage());
-        }
+        investigationsRepo.deleteById(id);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Investigations> getByPrescription(Integer prescriptionId) {
-
-        Prescription prescription =
-
-                prescriptionRepo
-                        .findById(prescriptionId)
-                        .orElseThrow(() -> new RuntimeException(
-                                "Prescription Not Found : "
-                                        + prescriptionId));
-
-        return investigationsRepo
-                .findByPrescription(prescription);
+        Prescription prescription = prescriptionRepo.findById(prescriptionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Prescription", prescriptionId));
+        accessControl.requirePrescriptionAccess(prescription);
+        return investigationsRepo.findByPrescription(prescription);
     }
+
+    private ClinicalContext resolveContext(Integer registrationId, Integer prescriptionId) {
+        Prescription prescription = null;
+        PatientRegistration registration = null;
+
+        if (prescriptionId != null) {
+            prescription = prescriptionRepo.findById(prescriptionId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Prescription", prescriptionId));
+            accessControl.requirePrescriptionAccess(prescription);
+            registration = prescription.getConsultation().getPatientRegistration();
+        }
+
+        if (registrationId != null) {
+            PatientRegistration explicitRegistration = registrationRepo.findById(registrationId)
+                    .orElseThrow(() -> new ResourceNotFoundException("PatientRegistration", registrationId));
+            accessControl.requireRegistrationAccess(explicitRegistration);
+            if (registration != null && registration.getRegistrationId() != explicitRegistration.getRegistrationId()) {
+                throw new BusinessException("Prescription and registration do not belong to the same patient visit");
+            }
+            registration = explicitRegistration;
+        }
+
+        if (registration == null) {
+            throw new BusinessException("Registration or prescription is required");
+        }
+
+        return new ClinicalContext(registration, prescription);
+    }
+
+    private void requireDocument(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException("Document file is required");
+        }
+    }
+
+    private void cleanupUpload(UploadResult uploaded) {
+        try {
+            cloudinaryService.deleteFile(uploaded.publicId(), uploaded.resourceType());
+        } catch (IOException cleanupError) {
+            log.error("Failed to clean up investigation upload {}", uploaded.publicId(), cleanupError);
+        }
+    }
+
+    private InvestigationResponse toResponse(Investigations investigation) {
+        Document document = investigation.getDocument();
+        Prescription prescription = investigation.getPrescription();
+        PatientRegistration registration = investigation.getPatientRegistration();
+        return InvestigationResponse.builder()
+                .id(investigation.getId())
+                .investigationName(investigation.getInestigationName())
+                .notes(investigation.getNotes())
+                .registrationId(registration == null ? null : registration.getRegistrationId())
+                .prescriptionId(prescription == null ? null : prescription.getPrescriptionId())
+                .documentId(document == null ? null : document.getId())
+                .documentFileName(document == null ? null : document.getFileName())
+                .documentUrl(document == null ? null : document.getUrl())
+                .createdAt(investigation.getCreateAt())
+                .updatedAt(investigation.getUpdatedAt())
+                .build();
+    }
+
+    private record ClinicalContext(PatientRegistration registration, Prescription prescription) {}
 }

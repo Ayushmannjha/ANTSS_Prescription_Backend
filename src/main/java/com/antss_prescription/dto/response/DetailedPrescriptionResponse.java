@@ -72,6 +72,8 @@ public class DetailedPrescriptionResponse {
         private String testName;
         private String notes;
         private LocalDateTime createdAt;
+        private String documentUrl;
+        private String documentFileName;
     }
 
     // And the field

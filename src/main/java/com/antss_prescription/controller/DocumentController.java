@@ -50,6 +50,13 @@ public class DocumentController {
         return ResponseEntity.ok(documentService.getDocumentsByPrescription(prescriptionId));
     }
 
+    @GetMapping("/prescriptions/{prescriptionId}/documents")
+    public ResponseEntity<List<DocumentDto>> getDocumentsByPrescriptionAlias(
+            @PathVariable Integer prescriptionId) {
+
+        return ResponseEntity.ok(documentService.getDocumentsByPrescription(prescriptionId));
+    }
+
     @DeleteMapping("/patients/{patientId}/documents/{documentId}")
     public ResponseEntity<Void> deleteDocument(@PathVariable Integer patientId, @PathVariable Integer documentId) {
 
