@@ -13,6 +13,7 @@ public interface DocumentService {
 
         DocumentDto getDocument(Integer patientId, Integer documentId);
 
+        List<DocumentDto> getDocumentsByPrescription(Integer prescriptionId);
 
         void deleteDocument(Integer patientId, Integer documentId);
 

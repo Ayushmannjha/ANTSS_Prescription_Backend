@@ -5,15 +5,16 @@ import com.antss_prescription.docs.service.CloudinaryService.UploadResult;
 import com.antss_prescription.docs.service.dto.DocumentDto;
 import com.antss_prescription.entity.prescription.Document;
 import com.antss_prescription.entity.prescription.Patient;
+import com.antss_prescription.entity.prescription.Prescription;
 import com.antss_prescription.repository.prescription.DocumentRepo;
 import com.antss_prescription.repository.prescription.PatientRepo;
+import com.antss_prescription.repository.prescription.PrescriptionRepo;
 import com.antss_prescription.service.DocumentService;
 import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.exception.BusinessException;
 import com.antss_prescription.exception.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
-import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -38,8 +39,8 @@ public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentRepo documentRepository;
     private final PatientRepo patientRepository;
+    private final PrescriptionRepo prescriptionRepository;
     private final CloudinaryService cloudinaryService;
-    private final ModelMapper modelMapper;
     private final AccessControlService accessControl;
 
     @Override
@@ -64,7 +65,7 @@ public class DocumentServiceImpl implements DocumentService {
 
             Document savedDocument = documentRepository.saveAndFlush(document);
 
-            return modelMapper.map(savedDocument, DocumentDto.class);
+            return toDto(savedDocument);
 
         } catch (Exception e) {
             if (uploaded != null) {
@@ -88,8 +89,7 @@ public class DocumentServiceImpl implements DocumentService {
 
         return documentRepository.findByPatientId(patientId)
                 .stream()
-                .map(document ->
-                        modelMapper.map(document, DocumentDto.class))
+                .map(this::toDto)
                 .toList();
     }
 
@@ -104,7 +104,22 @@ public class DocumentServiceImpl implements DocumentService {
 
         accessControl.requirePatientAccess(document.getPatient());
 
-        return modelMapper.map(document, DocumentDto.class);
+        return toDto(document);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DocumentDto> getDocumentsByPrescription(Integer prescriptionId) {
+
+        Prescription prescription = prescriptionRepository.findById(prescriptionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Prescription", prescriptionId));
+
+        accessControl.requirePrescriptionAccess(prescription);
+
+        return documentRepository.getDocumentsByPrescription(prescription)
+                .stream()
+                .map(this::toDto)
+                .toList();
     }
 
     @Override
@@ -153,5 +168,18 @@ public class DocumentServiceImpl implements DocumentService {
         } catch (IOException cleanupError) {
             log.error("Failed to clean up Cloudinary upload {}", uploaded.publicId(), cleanupError);
         }
+    }
+
+    private DocumentDto toDto(Document document) {
+        Patient patient = document.getPatient();
+        return DocumentDto.builder()
+                .id(document.getId())
+                .fileName(document.getFileName())
+                .url(document.getUrl())
+                .documentType(document.getDocumentType())
+                .patientId(patient == null ? 0 : patient.getPatientId())
+                .patientName(patient == null ? null : patient.getPatientName())
+                .mobileNumber(patient == null ? null : patient.getMobileNumber())
+                .build();
     }
 }

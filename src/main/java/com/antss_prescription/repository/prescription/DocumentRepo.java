@@ -3,6 +3,7 @@ package com.antss_prescription.repository.prescription;
 import java.util.List;
 import java.util.Optional;
 
+import com.antss_prescription.entity.prescription.Prescription;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -26,5 +27,7 @@ public interface DocumentRepo extends JpaRepository<Document, Integer> {
 	List<Document> findByPatientPatientId(int patientId);
 	boolean existsByPatientPatientId(int patientId);
     Optional<Document> findByUrl(String url);
+
+    List<Document> getDocumentsByPrescription(Prescription prescription);
 
 }
