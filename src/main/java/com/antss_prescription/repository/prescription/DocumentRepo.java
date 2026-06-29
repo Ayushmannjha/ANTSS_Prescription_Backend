@@ -30,4 +30,6 @@ public interface DocumentRepo extends JpaRepository<Document, Integer> {
 
     List<Document> getDocumentsByPrescription(Prescription prescription);
 
+    void deleteByPrescription(Prescription prescription);
+
 }

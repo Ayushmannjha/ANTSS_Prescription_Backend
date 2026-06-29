@@ -1,5 +1,7 @@
 package com.antss_prescription.dto.response;
 
+import java.time.LocalDateTime;
+
 import com.antss_prescription.entity.prescription.Patient;
 
 import lombok.Data;
@@ -13,5 +15,8 @@ public class PatientRegistrationResponse {
 	private String clinicName;
 	private Long hospitalId;
 	private String hospitalName;
+	private String status;
+	private LocalDateTime createdAt;
+	private LocalDateTime updatedAt;
 	
 }

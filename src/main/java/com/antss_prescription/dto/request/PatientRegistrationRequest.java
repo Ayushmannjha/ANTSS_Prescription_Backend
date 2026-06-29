@@ -19,9 +19,9 @@ public class PatientRegistrationRequest {
     @Size(max = 50)
     private String status;
 
-    @AssertTrue(message = "Provide either patientId or patient details")
+    @AssertTrue(message = "Patient details are required")
     public boolean isPatientSelectionValid() {
-        return (patientId == null) != (patient == null);
+        return patient != null;
     }
 
     @AssertTrue(message = "Exactly one hospital or clinic is required")

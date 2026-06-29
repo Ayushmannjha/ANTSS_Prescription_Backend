@@ -47,6 +47,9 @@ public class PatientRegistrationController {
         response.setRegistrationId(savedRegistration.getRegistrationId());
         response.setRegistrationNumber(savedRegistration.getRegistrationNumber());
         response.setPatient(savedRegistration.getPatient());
+        response.setStatus(savedRegistration.getStatus());
+        response.setCreatedAt(savedRegistration.getCreatedAt());
+        response.setUpdatedAt(savedRegistration.getUpdatedAt());
 
         if (savedRegistration.getClinic() != null) {
             response.setClinicId(savedRegistration.getClinic().getId());
