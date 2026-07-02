@@ -14,6 +14,10 @@ public class MedicineMasterRequest {
     private String strength;
     @Size(max = 100)
     private String dosageForm;
+    @Size(max = 100)
+    private String dosage;
+    @Size(max = 500)
+    private String instructions;
     @Size(max = 255)
     private String manufacturer;
     private Boolean active;
