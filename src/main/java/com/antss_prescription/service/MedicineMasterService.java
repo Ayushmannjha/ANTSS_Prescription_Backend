@@ -9,6 +9,8 @@ public interface MedicineMasterService {
 
     MedicineMaster saveMedicine(MedicineMaster medicine, UUID userId);
 
+    MedicineMaster updateMedicine(Long medicineId, MedicineMaster medicine, UUID userId);
+
     MedicineMaster getMedicineById(Long medicineId, UUID userId);
 
     List<MedicineMaster> searchMedicine(String keyword, UUID userId);

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -32,16 +33,19 @@ public class MedicineMasterController {
     public ResponseEntity<MedicineMaster> saveMedicine(
             @Valid @RequestBody MedicineMasterRequest request) {
 
-        MedicineMaster medicine = new MedicineMaster();
-        medicine.setMedicineName(request.getMedicineName());
-        medicine.setGenericName(request.getGenericName());
-        medicine.setStrength(request.getStrength());
-        medicine.setDosageForm(request.getDosageForm());
-        medicine.setManufacturer(request.getManufacturer());
-        medicine.setActive(request.getActive() == null ? Boolean.TRUE : request.getActive());
+        MedicineMaster medicine = toMedicineMaster(request);
 
         return ResponseEntity.ok(
                 medicineService.saveMedicine(medicine, accessControl.currentUser().getId()));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<MedicineMaster> updateMedicine(
+            @PathVariable Long id,
+            @Valid @RequestBody MedicineMasterRequest request) {
+
+        return ResponseEntity.ok(
+                medicineService.updateMedicine(id, toMedicineMaster(request), accessControl.currentUser().getId()));
     }
 
     @GetMapping("/{id}")
@@ -75,5 +79,18 @@ public class MedicineMasterController {
         medicineService.deleteMedicine(id, accessControl.currentUser().getId());
 
         return ResponseEntity.ok("Medicine deleted successfully");
+    }
+
+    private MedicineMaster toMedicineMaster(MedicineMasterRequest request) {
+        MedicineMaster medicine = new MedicineMaster();
+        medicine.setMedicineName(request.getMedicineName());
+        medicine.setGenericName(request.getGenericName());
+        medicine.setStrength(request.getStrength());
+        medicine.setDosageForm(request.getDosageForm());
+        medicine.setDosage(request.getDosage());
+        medicine.setInstructions(request.getInstructions());
+        medicine.setManufacturer(request.getManufacturer());
+        medicine.setActive(request.getActive() == null ? Boolean.TRUE : request.getActive());
+        return medicine;
     }
 }

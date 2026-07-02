@@ -36,6 +36,27 @@ public class MedicineMasterServiceImpl implements MedicineMasterService {
     }
 
     @Override
+    public MedicineMaster updateMedicine(Long medicineId, MedicineMaster medicine, UUID userId) {
+
+        userId = requireCurrentUserId(userId);
+
+        MedicineMaster existingMedicine = medicineRepository
+                .findByMedicineIdAndUserId(medicineId, userId)
+                .orElseThrow(() -> new RuntimeException("Medicine not found"));
+
+        existingMedicine.setMedicineName(medicine.getMedicineName());
+        existingMedicine.setGenericName(medicine.getGenericName());
+        existingMedicine.setStrength(medicine.getStrength());
+        existingMedicine.setDosageForm(medicine.getDosageForm());
+        existingMedicine.setDosage(medicine.getDosage());
+        existingMedicine.setInstructions(medicine.getInstructions());
+        existingMedicine.setManufacturer(medicine.getManufacturer());
+        existingMedicine.setActive(medicine.getActive() == null ? Boolean.TRUE : medicine.getActive());
+
+        return medicineRepository.save(existingMedicine);
+    }
+
+    @Override
     public MedicineMaster getMedicineById(Long medicineId, UUID userId) {
 
         userId = requireCurrentUserId(userId);
