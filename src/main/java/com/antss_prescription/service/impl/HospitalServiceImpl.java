@@ -104,13 +104,16 @@ public class HospitalServiceImpl implements HospitalService {
         hospital.setMaxDoctorLimit(allowedDoctors);
         hospital.setStatus(EntityStatus.ACTIVE);
         Hospital saved = hospitalRepository.save(hospital);
+        String setupToken = passwordResetTokenService.issue(savedHospitalUser);
 
         emailService.sendCredentialsEmail(
                 request.getEmail(),
                 request.getHospitalName(),
                 request.getEmail(),
                 "Hospital",
-                subEndDate
+                subEndDate,
+                UserType.HOSPITAL,
+                setupToken
         );
 
         log.info("Hospital created: {} (code: {})", saved.getHospitalName(), saved.getHospitalCode());

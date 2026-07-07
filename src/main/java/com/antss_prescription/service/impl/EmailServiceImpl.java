@@ -1,6 +1,7 @@
 package com.antss_prescription.service.impl;
 
 import com.antss_prescription.service.EmailService;
+import com.antss_prescription.enums.UserType;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +12,8 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.mail.internet.MimeMessage;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @Service
@@ -22,6 +25,12 @@ public class EmailServiceImpl implements EmailService {
 
     @Value("${spring.mail.username}")
     private String fromEmail;
+
+    @Value("${app.owner-frontend-url}")
+    private String ownerFrontendUrl;
+
+    @Value("${app.prescription-frontend-url}")
+    private String prescriptionFrontendUrl;
 
     @Override
     public void sendRegistrationNotificationToAdmin(String adminEmail, String userFullName,
@@ -124,15 +133,17 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public void sendApprovalEmail(String toEmail, String fullName) {
+    public void sendApprovalEmail(String toEmail, String fullName, String resetToken) {
         String subject = "Account Approved - Antss Prescription";
-        String body = "Dear " + fullName + ",\n\n" +
-                "Your account has been approved. You can now log in to the Antss Prescription portal.\n\n" +
-                "Username: " + toEmail + "\n" +
-                " We value our client credentials and hence we have approved you in the system " +
-                "but please create your own password using the forgot password reset link to enter the application"+
-               "Thank you for choosing Antss Prescription.";
-        sendEmail(toEmail, subject, body);
+        String passwordSetupUrl = buildOwnerFrontendUrl("/login?resetToken=" + encode(resetToken));
+        String htmlContent = buildActionEmail(
+                "Account Approved",
+                "Dear " + fullName + ", your account has been approved. Use the button below to create your password.",
+                "Username: " + toEmail + "<br>This secure setup link is valid for 1 hour.",
+                "Set Password",
+                passwordSetupUrl
+        );
+        sendHtmlEmail(toEmail, subject, htmlContent);
     }
 
     @Override
@@ -155,27 +166,87 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public void sendPasswordResetEmail(String toEmail, String fullName, String resetToken) {
+    public void sendPasswordResetEmail(String toEmail, String fullName, String resetToken, UserType userType) {
         String subject = "Password Reset Request - Antss Prescription";
-        String body = "Dear " + fullName + ",\n\n" +
-                "We received a request to reset your password.\n\n" +
-                "Your password reset token is:\n" + resetToken + "\n\n" +
-                "This token is valid for 1 hour. If you did not request a password reset, please ignore this email.";
-        sendEmail(toEmail, subject, body);
+        String resetUrl = buildFrontendUrlForUserType(userType, "/login?resetToken=" + encode(resetToken));
+        String htmlContent = buildActionEmail(
+                "Reset Your Password",
+                "Dear " + fullName + ", we received a request to reset your password.",
+                "Use the button below to open the reset password page. This link is valid for 1 hour. If you did not request this, please ignore this email.",
+                "Reset Password",
+                resetUrl
+        );
+        sendHtmlEmail(toEmail, subject, htmlContent);
     }
 
     @Override
-    public void sendCredentialsEmail(String toEmail, String entityName, String username, String roleName, java.time.LocalDate endDate) {
+    public void sendCredentialsEmail(String toEmail, String entityName, String username, String roleName,
+                                     java.time.LocalDate endDate, UserType userType, String resetToken) {
         String subject = "Access Credentials - Antss Prescription";
-        String body = "Dear " + entityName + ",\n\n" +
-                "You have been added to the Antss Prescription portal as a " + roleName + ".\n\n" +
-                "Your account setup details:\n" +
-                "Username/Email: " + username + "\n" +
-                "Your subscription / validity is active until: " + endDate + "\n\n" +
-                "We value our client's privcacy but we have authorized you by this email so please create your own password through the password reset before login" +
-                " Use this token with the reset-password endpoint within 1 hour to choose your password.\n\n" +
-                "Thank you.";
-        sendEmail(toEmail, subject, body);
+        String setupUrl = buildFrontendUrlForUserType(userType, "/login?resetToken=" + encode(resetToken));
+        String htmlContent = buildActionEmail(
+                "Portal Access Created",
+                "Dear " + entityName + ", you have been added to the Antss Prescription portal as a " + roleName + ".",
+                "Username/Email: " + username + "<br>Your subscription / validity is active until: " + endDate + "<br>Use the button below to create your password.",
+                "Set Password",
+                setupUrl
+        );
+        sendHtmlEmail(toEmail, subject, htmlContent);
+    }
+
+    private String buildActionEmail(String title, String intro, String details, String buttonText, String buttonUrl) {
+        return "<!DOCTYPE html>" +
+                "<html lang=\"en\">" +
+                "<head>" +
+                "  <meta charset=\"UTF-8\">" +
+                "  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+                "  <title>" + title + " - Antss Prescription</title>" +
+                "</head>" +
+                "<body style=\"margin:0;padding:0;background:#0f172a;font-family:Arial,Helvetica,sans-serif;color:#f8fafc;\">" +
+                "  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#0f172a;padding:40px 12px;\">" +
+                "    <tr><td align=\"center\">" +
+                "      <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;background:#1e293b;border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;\">" +
+                "        <tr><td style=\"background:#f97316;padding:28px 32px;text-align:center;\">" +
+                "          <div style=\"font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#fff7ed;\">Antss Prescription</div>" +
+                "          <h1 style=\"margin:8px 0 0;font-size:26px;line-height:1.25;color:#ffffff;\">" + title + "</h1>" +
+                "        </td></tr>" +
+                "        <tr><td style=\"padding:32px;\">" +
+                "          <p style=\"margin:0 0 18px;font-size:16px;line-height:1.6;color:#cbd5e1;\">" + intro + "</p>" +
+                "          <div style=\"margin:0 0 28px;padding:16px 18px;background:#0f172a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;font-size:14px;line-height:1.7;color:#e2e8f0;\">" + details + "</div>" +
+                "          <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\">" +
+                "            <a href=\"" + buttonUrl + "\" target=\"_blank\" style=\"display:inline-block;background:#ea580c;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;padding:14px 28px;border-radius:10px;\">" + buttonText + "</a>" +
+                "          </td></tr></table>" +
+                "          <p style=\"margin:28px 0 0;font-size:12px;line-height:1.6;color:#64748b;text-align:center;\">If the button does not open, please contact support.</p>" +
+                "        </td></tr>" +
+                "      </table>" +
+                "    </td></tr>" +
+                "  </table>" +
+                "</body></html>";
+    }
+
+    private String buildOwnerFrontendUrl(String path) {
+        return buildFrontendUrl(ownerFrontendUrl, path);
+    }
+
+    private String buildPrescriptionFrontendUrl(String path) {
+        return buildFrontendUrl(prescriptionFrontendUrl, path);
+    }
+
+    private String buildFrontendUrlForUserType(UserType userType, String path) {
+        if (userType == UserType.DOCTOR || userType == UserType.RMO) {
+            return buildPrescriptionFrontendUrl(path);
+        }
+        return buildOwnerFrontendUrl(path);
+    }
+
+    private String buildFrontendUrl(String frontendUrl, String path) {
+        String normalizedBase = frontendUrl == null ? "" : frontendUrl.replaceAll("/+$", "");
+        String normalizedPath = path.startsWith("/") ? path : "/" + path;
+        return normalizedBase + normalizedPath;
+    }
+
+    private String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private void sendEmail(String to, String subject, String body) {
