@@ -132,13 +132,16 @@ public class RmoServiceImpl implements RmoService {
         rmo.setUser(savedRmoUser);
 
         Rmo saved = rmoRepository.save(rmo);
+        String setupToken = passwordResetTokenService.issue(savedRmoUser);
 
         emailService.sendCredentialsEmail(
                 request.getEmail(),
                 request.getRmoName(),
                 request.getEmail(),
                 "RMO",
-                subEndDate
+                subEndDate,
+                UserType.RMO,
+                setupToken
         );
 
         log.info("Rmo created: {}", saved.getRmoName());

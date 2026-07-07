@@ -104,6 +104,7 @@ public class ClinicServiceImpl implements ClinicService {
         clinic.setMaxDoctorLimit(allowedDoctors);
         clinic.setStatus(EntityStatus.ACTIVE);
         Clinic saved = clinicRepository.save(clinic);
+        String setupToken = passwordResetTokenService.issue(savedClinicUser);
 
 
         emailService.sendCredentialsEmail(
@@ -111,7 +112,9 @@ public class ClinicServiceImpl implements ClinicService {
                 request.getClinicName(),
                 request.getEmail(),
                 "Clinic",
-                subEndDate
+                subEndDate,
+                UserType.CLINIC,
+                setupToken
         );
 
         log.info("Clinic created: {} (code: {})", saved.getClinicName(), saved.getClinicCode());

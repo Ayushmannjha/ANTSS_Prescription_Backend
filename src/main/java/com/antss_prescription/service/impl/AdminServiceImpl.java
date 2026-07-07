@@ -101,7 +101,7 @@ public class AdminServiceImpl implements AdminService {
         credential.setUsername(saved.getEmail());
         credential.setPasswordHash(encodedPassword);
         loginCredentialRepository.save(credential);
-      //  String setupToken = passwordResetTokenService.issue(saved);
+        String setupToken = passwordResetTokenService.issue(saved);
 
         LocalDate subEndDate = LocalDate.now().plusYears(1); // fallback
         List<UserSubscription> subscriptions = userSubscriptionRepository.findByUserId(userId);
@@ -127,7 +127,7 @@ public class AdminServiceImpl implements AdminService {
             updateEntityMaxDoctorLimit(user, sub.getAllowedDoctors());
         }
 
-        emailService.sendApprovalEmail(user.getEmail(), user.getFullName());
+        emailService.sendApprovalEmail(user.getEmail(), user.getFullName(), setupToken);
         log.info("User approved and credentials emailed: {}", user.getEmail());
         return mapToUserResponse(saved);
     }

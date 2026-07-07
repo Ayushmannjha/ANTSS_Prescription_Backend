@@ -85,7 +85,7 @@ public class AuthServiceImpl implements AuthService {
     @Value("${app.jwt.secret}")
     private String jwtSecret;
 
-    @Value("${app.base-url:http://localhost:2030}")
+    @Value("${app.base-url}")
     private String baseUrl;
 
 
@@ -320,7 +320,7 @@ public void register(RegisterRequest request) {
     public void forgotPassword(ForgotPasswordRequest request) {
         userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
             String token = passwordResetTokenService.issue(user);
-            emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), token);
+            emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), token, user.getUserType());
             log.info("Password reset email sent to: {}", user.getEmail());
         });
     }

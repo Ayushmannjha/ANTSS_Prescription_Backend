@@ -153,13 +153,16 @@ public class DoctorServiceImpl implements DoctorService {
         syncActiveDoctorCount(savedDoctor);
 
         allocateDoctorToSubscription(savedDoctor, activeSubs);
+        String setupToken = passwordResetTokenService.issue(savedDoctorUser);
 
         emailService.sendCredentialsEmail(
                 request.getEmail(),
                 request.getDoctorName(),
                 request.getEmail(),
                 "Doctor",
-                subEndDate);
+                subEndDate,
+                UserType.DOCTOR,
+                setupToken);
 
         log.info("Doctor added: {} with code {}", savedDoctor.getDoctorName(), savedDoctor.getDoctorCode());
         return mapToResponse(savedDoctor);
