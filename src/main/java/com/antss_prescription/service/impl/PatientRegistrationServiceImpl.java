@@ -19,6 +19,7 @@ import com.antss_prescription.repository.prescription.PatientRegistrationRepo;
 import com.antss_prescription.repository.prescription.PatientRepo;
 import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.service.PatientRegistrationService;
+import com.antss_prescription.websocket.PatientRegistrationWebSocketHandler;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class PatientRegistrationServiceImpl implements PatientRegistrationServic
     private final HospitalRepository hospitalRepository;
     private final AccessControlService accessControl;
     private final ConsultationRepo consultationRepository;
+    private final PatientRegistrationWebSocketHandler patientRegistrationWebSocketHandler;
 
     @Override
     @Transactional
@@ -42,7 +44,9 @@ public class PatientRegistrationServiceImpl implements PatientRegistrationServic
         registration.setRegistrationNumber(generateRegistrationNumber(registration));
         registration.setCreatedAt(LocalDateTime.now());
         registration.setUpdatedAt(LocalDateTime.now());
-        return registrationRepo.save(registration);
+        PatientRegistration saved = registrationRepo.save(registration);
+        patientRegistrationWebSocketHandler.publishRegistrationCreated(saved);
+        return saved;
     }
 
     private Patient resolvePatient(Patient incomingPatient) {
