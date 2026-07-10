@@ -46,6 +46,7 @@ public class SecurityConfig {
                                 "/api/packages",
                                 "/api/packages/**",
                                 "/api/admin/approve-email",
+                                "/ws/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**",
