@@ -749,6 +749,17 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
         return buildDetailedResponse(prescription);
     }
 
+    @Override
+    public DetailedPrescriptionResponse getDetailedPrescriptionForPrintById(int prescriptionId) {
+
+        Prescription prescription = prescriptionRepository
+                .findById(prescriptionId)
+                .orElseThrow(() -> new RuntimeException(
+                        "Prescription not found: " + prescriptionId));
+
+        return buildDetailedResponse(prescription);
+    }
+
     // ─────────────────────────────────────────────
     // READ — detailed by patient ID
     // ─────────────────────────────────────────────

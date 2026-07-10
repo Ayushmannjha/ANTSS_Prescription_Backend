@@ -48,7 +48,9 @@ public class SecurityConfig {
                                 "/api/admin/approve-email",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/v3/api-docs/**"
+                                "/v3/api-docs/**",
+                                "/api/print-headers/*/prescriptions/*/pdf",
+                                "/api/print-headers/prescriptions/*/pdf"
                         ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

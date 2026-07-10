@@ -18,6 +18,7 @@ public interface PrescriptionService {
     List<PrescriptionResponse> getPrescriptionsByPatientId(int patientId);
     List<PrescriptionResponse> getPrescriptionsByRegistrationId(int registrationId);
     DetailedPrescriptionResponse getDetailedPrescriptionById(int prescriptionId);
+    DetailedPrescriptionResponse getDetailedPrescriptionForPrintById(int prescriptionId);
     List<DetailedPrescriptionResponse> getDetailedPrescriptionsByPatientId(int patientId);
 
 
