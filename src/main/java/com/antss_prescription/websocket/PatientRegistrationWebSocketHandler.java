@@ -48,20 +48,18 @@ public class PatientRegistrationWebSocketHandler extends TextWebSocketHandler {
             payload.put("createdAt", registration.getCreatedAt());
             payload.put("updatedAt", registration.getUpdatedAt());
 
-            if (registration.getPatient() != null) {
-                Map<String, Object> patient = new LinkedHashMap<>();
-                patient.put("patientId", registration.getPatient().getPatientId());
-                patient.put("patientName", registration.getPatient().getPatientName());
-                patient.put("mobileNumber", registration.getPatient().getMobileNumber());
-                patient.put("gender", registration.getPatient().getGender());
-                patient.put("age", registration.getPatient().getAge());
-                patient.put("address", registration.getPatient().getAddress());
-                patient.put("state", registration.getPatient().getState());
-                patient.put("city", registration.getPatient().getCity());
-                patient.put("pincode", registration.getPatient().getPincode());
-                patient.put("dateOfBirth", registration.getPatient().getDateOfBirth());
-                payload.put("patient", patient);
-            }
+            Map<String, Object> patient = new LinkedHashMap<>();
+            patient.put("patientId", registration.getRegistrationId());
+            patient.put("patientName", registration.getPatientName());
+            patient.put("mobileNumber", registration.getMobileNumber());
+            patient.put("gender", registration.getGender());
+            patient.put("age", registration.getAge());
+            patient.put("address", registration.getAddress());
+            patient.put("state", registration.getState());
+            patient.put("city", registration.getCity());
+            patient.put("pincode", registration.getPincode());
+            patient.put("dateOfBirth", registration.getDateOfBirth());
+            payload.put("patient", patient);
 
             TextMessage message = new TextMessage(objectMapper.writeValueAsString(payload));
             sessions.removeIf(session -> !session.isOpen());

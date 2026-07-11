@@ -64,7 +64,7 @@ public class TestRequestedServiceImpl implements TestRequestedService {
                     .documentType("TEST_REQUESTED")
                     .cloudinaryPublicId(uploaded.publicId())
                     .cloudinaryResourceType(uploaded.resourceType())
-                    .patient(context.registration().getPatient())
+                    .patientRegistration(context.registration())
                     .prescription(context.prescription())
                     .build();
             Document savedDocument = documentRepo.saveAndFlush(document);

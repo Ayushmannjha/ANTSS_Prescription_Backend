@@ -9,7 +9,6 @@ import com.antss_prescription.entity.Hospital;
 import com.antss_prescription.entity.Rmo;
 import com.antss_prescription.entity.User;
 import com.antss_prescription.entity.prescription.Consultation;
-import com.antss_prescription.entity.prescription.Patient;
 import com.antss_prescription.entity.prescription.PatientRegistration;
 import com.antss_prescription.entity.prescription.Prescription;
 import com.antss_prescription.enums.EntityStatus;
@@ -121,17 +120,6 @@ public class AccessControlService {
 
     public void requireRegistrationAccess(PatientRegistration registration) {
         if (!canAccess(registration, currentUser())) throw forbidden();
-    }
-
-    public boolean canAccess(Patient patient, User user) {
-        if (patient == null) return false;
-        if (isAdmin(user)) return true;
-        return registrationRepository.findByPatient(patient).stream()
-                .anyMatch(registration -> canAccess(registration, user));
-    }
-
-    public void requirePatientAccess(Patient patient) {
-        if (!canAccess(patient, currentUser())) throw forbidden();
     }
 
     public boolean canAccess(Consultation consultation, User user) {

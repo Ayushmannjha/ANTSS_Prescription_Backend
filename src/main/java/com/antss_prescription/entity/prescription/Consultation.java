@@ -52,11 +52,6 @@ public class Consultation {
     private List<PastMedicalHistory> pastMedicalHistories = new ArrayList<>();
 
     @ManyToOne
-    @JoinColumn(name = "patient_id")
-    @NotNull
-    private Patient patient;
-
-    @ManyToOne
     @JoinColumn(name = "vitals_id")
     private Vitals vitals;
 
