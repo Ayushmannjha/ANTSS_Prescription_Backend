@@ -15,7 +15,10 @@ import lombok.*;
 @Entity
 @Table(
 		name = "Patient",
-		uniqueConstraints = @UniqueConstraint(name = "uk_patient_mobile_number", columnNames = "mobile_number")
+		indexes = {
+				@Index(name = "idx_patient_mobile_number", columnList = "mobile_number"),
+				@Index(name = "idx_patient_identity_search", columnList = "mobile_number, dateOfBirth, gender")
+		}
 )
 @Setter
 @Getter
@@ -30,13 +33,14 @@ public class Patient {
 	@NotBlank
 	@Size(max = 100)
 	private String patientName;
-	@Column(name = "mobile_number", nullable = false, unique = true, length = 10)
+	@Column(name = "mobile_number", nullable = false, length = 10)
 	@NotBlank
 	@Pattern(regexp = "^[6-9][0-9]{9}$", message = "must be a valid 10-digit mobile number")
 	private String mobileNumber;
 	@NotBlank
 	@Size(max = 20)
 	private String gender;
+	@NotBlank
 	@Size(max = 20)
 	private String dateOfBirth;
 	@Min(0)

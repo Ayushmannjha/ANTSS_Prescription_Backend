@@ -16,7 +16,7 @@ public class PatientRequest {
     private String mobileNumber;
     @NotBlank @Size(max = 20)
     private String gender;
-    @Size(max = 20)
+    @NotBlank @Size(max = 20)
     private String dateOfBirth;
     @Min(0) @Max(150)
     private int age;

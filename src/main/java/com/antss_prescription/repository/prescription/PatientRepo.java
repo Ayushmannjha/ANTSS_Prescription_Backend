@@ -10,7 +10,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface PatientRepo extends JpaRepository<Patient, Integer>{
 
-    Optional<Patient> findByMobileNumber(String mobileNumber);
+    List<Patient> findByMobileNumber(String mobileNumber);
+    Optional<Patient> findFirstByMobileNumberAndDateOfBirthAndGenderIgnoreCase(
+            String mobileNumber, String dateOfBirth, String gender);
 
     @Query("""
             SELECT DISTINCT r.patient FROM PatientRegistration r

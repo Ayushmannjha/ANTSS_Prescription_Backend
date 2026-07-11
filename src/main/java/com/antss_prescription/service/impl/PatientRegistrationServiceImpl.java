@@ -12,6 +12,7 @@ import com.antss_prescription.entity.Hospital;
 import com.antss_prescription.entity.prescription.Patient;
 import com.antss_prescription.entity.prescription.PatientRegistration;
 import com.antss_prescription.exception.ConflictException;
+import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.repository.ClinicRepository;
 import com.antss_prescription.repository.HospitalRepository;
 import com.antss_prescription.repository.prescription.ConsultationRepo;
@@ -61,16 +62,23 @@ public class PatientRegistrationServiceImpl implements PatientRegistrationServic
             throw new IllegalArgumentException("Patient mobile number is required");
         }
 
-        Patient patient = patientRepository.findByMobileNumber(mobileNumber)
-                .orElseGet(() -> {
-                    incomingPatient.setCreatedAt(LocalDateTime.now());
-                    return incomingPatient;
-                });
+        String dateOfBirth = normalize(incomingPatient.getDateOfBirth());
+        String gender = normalize(incomingPatient.getGender());
+
+        Patient patient = incomingPatient.getPatientId() > 0
+                ? patientRepository.findById(incomingPatient.getPatientId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Patient", incomingPatient.getPatientId()))
+                : findExistingPatient(mobileNumber, dateOfBirth, gender)
+                        .orElse(incomingPatient);
+
+        if (patient.getCreatedAt() == null) {
+            patient.setCreatedAt(LocalDateTime.now());
+        }
 
         patient.setPatientName(incomingPatient.getPatientName());
         patient.setMobileNumber(mobileNumber);
-        patient.setGender(incomingPatient.getGender());
-        patient.setDateOfBirth(incomingPatient.getDateOfBirth());
+        patient.setGender(gender);
+        patient.setDateOfBirth(dateOfBirth);
         patient.setAge(incomingPatient.getAge());
         patient.setAddress(incomingPatient.getAddress());
         patient.setState(incomingPatient.getState());
@@ -78,6 +86,18 @@ public class PatientRegistrationServiceImpl implements PatientRegistrationServic
         patient.setPincode(incomingPatient.getPincode());
         patient.setUpdatedAt(LocalDateTime.now());
         return patientRepository.save(patient);
+    }
+
+    private java.util.Optional<Patient> findExistingPatient(String mobileNumber, String dateOfBirth, String gender) {
+        if (dateOfBirth.isBlank() || gender.isBlank()) {
+            return java.util.Optional.empty();
+        }
+        return patientRepository.findFirstByMobileNumberAndDateOfBirthAndGenderIgnoreCase(
+                mobileNumber, dateOfBirth, gender);
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private String generateRegistrationNumber(PatientRegistration registration) {
