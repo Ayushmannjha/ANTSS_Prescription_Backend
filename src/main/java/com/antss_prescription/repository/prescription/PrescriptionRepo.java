@@ -13,8 +13,6 @@ import org.springframework.data.repository.query.Param;
 
 
 public interface PrescriptionRepo extends JpaRepository<Prescription, Integer>{
-	List<Prescription> findByConsultation_Patient_PatientId(int consultation_Patient_PatientId);
-
 	List<Prescription> findByConsultation_PatientRegistration_RegistrationId(int consultation_PatientRegistration_RegistrationId);;
 	boolean existsByConsultation(Consultation consultation);
 

@@ -10,32 +10,17 @@ import com.antss_prescription.entity.prescription.Consultation;
 import com.antss_prescription.entity.prescription.Diagnosis;
 import com.antss_prescription.entity.prescription.GeneralExamination;
 import com.antss_prescription.entity.prescription.PastMedicalHistory;
-import com.antss_prescription.entity.prescription.Patient;
 import com.antss_prescription.entity.prescription.PatientRegistration;
 import com.antss_prescription.entity.prescription.Vitals;
 
 public final class ClinicalRequestMapper {
     private ClinicalRequestMapper() {}
 
-    public static Patient toPatient(PatientRequest request) {
-        Patient patient = new Patient();
-        patient.setPatientName(request.getPatientName());
-        patient.setMobileNumber(request.getMobileNumber());
-        patient.setGender(request.getGender());
-        patient.setDateOfBirth(request.getDateOfBirth());
-        patient.setAge(request.getAge());
-        patient.setAddress(request.getAddress());
-        patient.setState(request.getState());
-        patient.setCity(request.getCity());
-        patient.setPincode(request.getPincode());
-        return patient;
-    }
-
     public static PatientRegistration toRegistration(PatientRegistrationRequest request) {
         PatientRegistration registration = new PatientRegistration();
-        Patient patient = request.getPatient() == null ? new Patient() : toPatient(request.getPatient());
-        if (request.getPatientId() != null) patient.setPatientId(request.getPatientId());
-        registration.setPatient(patient);
+        if (request.getPatient() != null) {
+            applyPatient(request.getPatient(), registration);
+        }
         if (request.getClinicId() != null) {
             Clinic clinic = new Clinic();
             clinic.setId(request.getClinicId());
@@ -48,6 +33,24 @@ public final class ClinicalRequestMapper {
         }
         registration.setStatus(request.getStatus());
         return registration;
+    }
+
+    public static PatientRegistration toRegistration(PatientRequest request) {
+        PatientRegistration registration = new PatientRegistration();
+        applyPatient(request, registration);
+        return registration;
+    }
+
+    private static void applyPatient(PatientRequest request, PatientRegistration registration) {
+        registration.setPatientName(request.getPatientName());
+        registration.setMobileNumber(request.getMobileNumber());
+        registration.setGender(request.getGender());
+        registration.setDateOfBirth(request.getDateOfBirth());
+        registration.setAge(request.getAge());
+        registration.setAddress(request.getAddress());
+        registration.setState(request.getState());
+        registration.setCity(request.getCity());
+        registration.setPincode(request.getPincode());
     }
 
     public static Consultation toConsultation(ConsultationRequest request) {

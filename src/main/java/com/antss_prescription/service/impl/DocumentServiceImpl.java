@@ -4,10 +4,10 @@ import com.antss_prescription.docs.service.CloudinaryService;
 import com.antss_prescription.docs.service.CloudinaryService.UploadResult;
 import com.antss_prescription.docs.service.dto.DocumentDto;
 import com.antss_prescription.entity.prescription.Document;
-import com.antss_prescription.entity.prescription.Patient;
+import com.antss_prescription.entity.prescription.PatientRegistration;
 import com.antss_prescription.entity.prescription.Prescription;
 import com.antss_prescription.repository.prescription.DocumentRepo;
-import com.antss_prescription.repository.prescription.PatientRepo;
+import com.antss_prescription.repository.prescription.PatientRegistrationRepo;
 import com.antss_prescription.repository.prescription.PrescriptionRepo;
 import com.antss_prescription.service.DocumentService;
 import com.antss_prescription.security.AccessControlService;
@@ -38,7 +38,7 @@ public class DocumentServiceImpl implements DocumentService {
             "jpeg", "image/jpeg");
 
     private final DocumentRepo documentRepository;
-    private final PatientRepo patientRepository;
+    private final PatientRegistrationRepo registrationRepository;
     private final PrescriptionRepo prescriptionRepository;
     private final CloudinaryService cloudinaryService;
     private final AccessControlService accessControl;
@@ -48,9 +48,9 @@ public class DocumentServiceImpl implements DocumentService {
         validateFile(file);
         UploadResult uploaded = null;
         try {
-            Patient patient = patientRepository.findById(patientId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Patient", patientId));
-            accessControl.requirePatientAccess(patient);
+            PatientRegistration registration = registrationRepository.findById(patientId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Patient registration", patientId));
+            accessControl.requireRegistrationAccess(registration);
 
             uploaded = cloudinaryService.uploadFile(file);
 
@@ -60,7 +60,7 @@ public class DocumentServiceImpl implements DocumentService {
                     .documentType(type)
                     .cloudinaryPublicId(uploaded.publicId())
                     .cloudinaryResourceType(uploaded.resourceType())
-                    .patient(patient)
+                    .patientRegistration(registration)
                     .build();
 
             Document savedDocument = documentRepository.saveAndFlush(document);
@@ -83,9 +83,9 @@ public class DocumentServiceImpl implements DocumentService {
     @Transactional(readOnly = true)
     public List<DocumentDto> getPatientDocuments(Integer patientId) {
 
-        Patient patient = patientRepository.findById(patientId)
-                .orElseThrow(() -> new ResourceNotFoundException("Patient", patientId));
-        accessControl.requirePatientAccess(patient);
+        PatientRegistration registration = registrationRepository.findById(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient registration", patientId));
+        accessControl.requireRegistrationAccess(registration);
 
         return documentRepository.findByPatientId(patientId)
                 .stream()
@@ -102,7 +102,7 @@ public class DocumentServiceImpl implements DocumentService {
                         patientId
                 ).orElseThrow(() -> new RuntimeException("Document not found"));
 
-        accessControl.requirePatientAccess(document.getPatient());
+        accessControl.requireRegistrationAccess(document.getPatientRegistration());
 
         return toDto(document);
     }
@@ -128,7 +128,7 @@ public class DocumentServiceImpl implements DocumentService {
         Document document = documentRepository.findByIdAndPatientId(documentId, patientId).orElseThrow(() ->
                         new ResourceNotFoundException("Document", documentId));
 
-        accessControl.requirePatientAccess(document.getPatient());
+        accessControl.requireRegistrationAccess(document.getPatientRegistration());
 
         try {
             String publicId = document.getCloudinaryPublicId() != null
@@ -171,15 +171,15 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     private DocumentDto toDto(Document document) {
-        Patient patient = document.getPatient();
+        PatientRegistration registration = document.getPatientRegistration();
         return DocumentDto.builder()
                 .id(document.getId())
                 .fileName(document.getFileName())
                 .url(document.getUrl())
                 .documentType(document.getDocumentType())
-                .patientId(patient == null ? 0 : patient.getPatientId())
-                .patientName(patient == null ? null : patient.getPatientName())
-                .mobileNumber(patient == null ? null : patient.getMobileNumber())
+                .patientId(registration == null ? 0 : registration.getRegistrationId())
+                .patientName(registration == null ? null : registration.getPatientName())
+                .mobileNumber(registration == null ? null : registration.getMobileNumber())
                 .build();
     }
 }

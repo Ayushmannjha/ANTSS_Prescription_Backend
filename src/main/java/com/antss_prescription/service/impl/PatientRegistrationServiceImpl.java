@@ -9,15 +9,12 @@ import org.springframework.stereotype.Service;
 import com.antss_prescription.dto.response.PatientRegistrationResponse;
 import com.antss_prescription.entity.Clinic;
 import com.antss_prescription.entity.Hospital;
-import com.antss_prescription.entity.prescription.Patient;
 import com.antss_prescription.entity.prescription.PatientRegistration;
 import com.antss_prescription.exception.ConflictException;
-import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.repository.ClinicRepository;
 import com.antss_prescription.repository.HospitalRepository;
 import com.antss_prescription.repository.prescription.ConsultationRepo;
 import com.antss_prescription.repository.prescription.PatientRegistrationRepo;
-import com.antss_prescription.repository.prescription.PatientRepo;
 import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.service.PatientRegistrationService;
 import com.antss_prescription.websocket.PatientRegistrationWebSocketHandler;
@@ -30,7 +27,6 @@ import lombok.RequiredArgsConstructor;
 public class PatientRegistrationServiceImpl implements PatientRegistrationService {
 
     private final PatientRegistrationRepo registrationRepo;
-    private final PatientRepo patientRepository;
     private final ClinicRepository clinicRepository;
     private final HospitalRepository hospitalRepository;
     private final AccessControlService accessControl;
@@ -41,7 +37,7 @@ public class PatientRegistrationServiceImpl implements PatientRegistrationServic
     @Transactional
     public PatientRegistration saveRegistration(PatientRegistration registration) {
         resolveAndAuthorizeFacility(registration);
-        registration.setPatient(resolvePatient(registration.getPatient()));
+        normalizePatientDetails(registration);
         registration.setRegistrationNumber(generateRegistrationNumber(registration));
         registration.setCreatedAt(LocalDateTime.now());
         registration.setUpdatedAt(LocalDateTime.now());
@@ -50,54 +46,46 @@ public class PatientRegistrationServiceImpl implements PatientRegistrationServic
         return saved;
     }
 
-    private Patient resolvePatient(Patient incomingPatient) {
-        if (incomingPatient == null) {
-            throw new IllegalArgumentException("Patient details are required");
-        }
-
-        String mobileNumber = incomingPatient.getMobileNumber() == null
-                ? ""
-                : incomingPatient.getMobileNumber().trim();
+    private void normalizePatientDetails(PatientRegistration registration) {
+        String mobileNumber = normalize(registration.getMobileNumber());
         if (mobileNumber.isBlank()) {
             throw new IllegalArgumentException("Patient mobile number is required");
         }
 
-        String dateOfBirth = normalize(incomingPatient.getDateOfBirth());
-        String gender = normalize(incomingPatient.getGender());
-
-        Patient patient = incomingPatient.getPatientId() > 0
-                ? patientRepository.findById(incomingPatient.getPatientId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Patient", incomingPatient.getPatientId()))
-                : findExistingPatient(mobileNumber, dateOfBirth, gender)
-                        .orElse(incomingPatient);
-
-        if (patient.getCreatedAt() == null) {
-            patient.setCreatedAt(LocalDateTime.now());
+        String dateOfBirth = normalize(registration.getDateOfBirth());
+        if (dateOfBirth.isBlank()) {
+            throw new IllegalArgumentException("Patient date of birth is required");
+        }
+        String gender = normalize(registration.getGender());
+        if (gender.isBlank()) {
+            throw new IllegalArgumentException("Patient gender is required");
         }
 
-        patient.setPatientName(incomingPatient.getPatientName());
-        patient.setMobileNumber(mobileNumber);
-        patient.setGender(gender);
-        patient.setDateOfBirth(dateOfBirth);
-        patient.setAge(incomingPatient.getAge());
-        patient.setAddress(incomingPatient.getAddress());
-        patient.setState(incomingPatient.getState());
-        patient.setCity(incomingPatient.getCity());
-        patient.setPincode(incomingPatient.getPincode());
-        patient.setUpdatedAt(LocalDateTime.now());
-        return patientRepository.save(patient);
-    }
-
-    private java.util.Optional<Patient> findExistingPatient(String mobileNumber, String dateOfBirth, String gender) {
-        if (dateOfBirth.isBlank() || gender.isBlank()) {
-            return java.util.Optional.empty();
-        }
-        return patientRepository.findFirstByMobileNumberAndDateOfBirthAndGenderIgnoreCase(
-                mobileNumber, dateOfBirth, gender);
+        registration.setPatientName(normalize(registration.getPatientName()));
+        registration.setMobileNumber(mobileNumber);
+        registration.setDateOfBirth(dateOfBirth);
+        registration.setGender(gender);
+        registration.setAddress(normalize(registration.getAddress()));
+        registration.setState(normalize(registration.getState()));
+        registration.setCity(normalize(registration.getCity()));
+        registration.setPincode(normalize(registration.getPincode()));
     }
 
     private String normalize(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private void copyPatientDetails(PatientRegistration source, PatientRegistration target) {
+        target.setPatientName(source.getPatientName());
+        target.setMobileNumber(source.getMobileNumber());
+        target.setGender(source.getGender());
+        target.setDateOfBirth(source.getDateOfBirth());
+        target.setAge(source.getAge());
+        target.setAddress(source.getAddress());
+        target.setState(source.getState());
+        target.setCity(source.getCity());
+        target.setPincode(source.getPincode());
+        normalizePatientDetails(target);
     }
 
     private String generateRegistrationNumber(PatientRegistration registration) {
@@ -209,7 +197,7 @@ public class PatientRegistrationServiceImpl implements PatientRegistrationServic
 
         accessControl.requireRegistrationAccess(existing);
         resolveAndAuthorizeFacility(registration);
-        existing.setPatient(resolvePatient(registration.getPatient()));
+        copyPatientDetails(registration, existing);
         existing.setClinic(registration.getClinic());
         existing.setHospital(registration.getHospital());
         existing.setStatus(registration.getStatus());
@@ -256,7 +244,16 @@ public class PatientRegistrationServiceImpl implements PatientRegistrationServic
         PatientRegistrationResponse response = new PatientRegistrationResponse();
         response.setRegistrationId(registration.getRegistrationId());
         response.setRegistrationNumber(registration.getRegistrationNumber());
-        response.setPatient(registration.getPatient());
+        response.setPatientId(registration.getRegistrationId());
+        response.setPatientName(registration.getPatientName());
+        response.setMobileNumber(registration.getMobileNumber());
+        response.setGender(registration.getGender());
+        response.setDateOfBirth(registration.getDateOfBirth());
+        response.setAge(registration.getAge());
+        response.setAddress(registration.getAddress());
+        response.setState(registration.getState());
+        response.setCity(registration.getCity());
+        response.setPincode(registration.getPincode());
         response.setStatus(registration.getStatus());
         response.setCreatedAt(registration.getCreatedAt());
         response.setUpdatedAt(registration.getUpdatedAt());

@@ -214,7 +214,6 @@ public class ConsultationServiceImpl implements ConsultationService {
         existing.setConsultationNumber(consultation.getConsultationNumber());
         existing.setDoctor(consultation.getDoctor());
         existing.setPatientRegistration(consultation.getPatientRegistration());
-        existing.setPatient(consultation.getPatient());
         existing.setAdvice(consultation.getAdvice());
         existing.setFollowUpDate(consultation.getFollowUpDate());
         existing.setUpdatedAt(LocalDateTime.now());
@@ -279,19 +278,16 @@ public class ConsultationServiceImpl implements ConsultationService {
         if (c.getPatientRegistration() != null) {
             response.setRegistrationId(c.getPatientRegistration().getRegistrationId());
             response.setRegistrationNumber(c.getPatientRegistration().getRegistrationNumber());
-        }
-
-        if (c.getPatient() != null) {
-            response.setPatientId(c.getPatient().getPatientId());
-            response.setPatientName(c.getPatient().getPatientName());
-            response.setMobileNumber(c.getPatient().getMobileNumber());
-            response.setGender(c.getPatient().getGender());
-            response.setAge(c.getPatient().getAge());
+            response.setPatientId(c.getPatientRegistration().getRegistrationId());
+            response.setPatientName(c.getPatientRegistration().getPatientName());
+            response.setMobileNumber(c.getPatientRegistration().getMobileNumber());
+            response.setGender(c.getPatientRegistration().getGender());
+            response.setAge(c.getPatientRegistration().getAge());
             response.setPatientAddress(formatAddress(
-                    c.getPatient().getAddress(),
-                    c.getPatient().getCity(),
-                    c.getPatient().getState(),
-                    c.getPatient().getPincode()));
+                    c.getPatientRegistration().getAddress(),
+                    c.getPatientRegistration().getCity(),
+                    c.getPatientRegistration().getState(),
+                    c.getPatientRegistration().getPincode()));
         }
 
         if (c.getCheifComplaints() != null && !c.getCheifComplaints().isEmpty()) {
@@ -402,7 +398,6 @@ public class ConsultationServiceImpl implements ConsultationService {
         accessControl.requireDoctorForRegistration(doctor, registration);
 
         consultation.setPatientRegistration(registration);
-        consultation.setPatient(registration.getPatient());
         consultation.setDoctor(doctor);
     }
 }

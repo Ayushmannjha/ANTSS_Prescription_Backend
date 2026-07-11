@@ -30,8 +30,8 @@ public class Document {
 
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "patient_id")
-    private Patient patient;
+    @JoinColumn(name = "registration_id")
+    private PatientRegistration patientRegistration;
 
     @JsonIgnore
     @ManyToOne

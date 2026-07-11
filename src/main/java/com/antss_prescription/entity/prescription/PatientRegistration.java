@@ -14,9 +14,11 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import org.hibernate.annotations.Check;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -35,11 +37,30 @@ public class PatientRegistration {
 	@Column(name = "registration_number", unique = true)
 	@Size(max = 100)
 	private String registrationNumber;//this is used as UHID
-	@ManyToOne
-	@JoinColumn(name = "patient_id")
-	@NotNull
-	@Valid
-	private Patient patient;
+	@NotBlank
+	@Size(max = 100)
+	private String patientName;
+	@Column(name = "mobile_number", nullable = true, length = 10)
+	@NotBlank
+	@Pattern(regexp = "^[6-9][0-9]{9}$", message = "must be a valid 10-digit mobile number")
+	private String mobileNumber;
+	@NotBlank
+	@Size(max = 20)
+	private String gender;
+	@NotBlank
+	@Size(max = 20)
+	private String dateOfBirth;
+	@Min(0)
+	@Max(150)
+	private int age;
+	@Size(max = 255)
+	private String address;
+	@Size(max = 100)
+	private String state;
+	@Size(max = 100)
+	private String city;
+	@Pattern(regexp = "^$|^[1-9][0-9]{5}$", message = "must be a valid 6-digit pincode")
+	private String pincode;
 	@ManyToOne
 	@JoinColumn(name="clinic_id", nullable = true)
 	private Clinic clinic;
