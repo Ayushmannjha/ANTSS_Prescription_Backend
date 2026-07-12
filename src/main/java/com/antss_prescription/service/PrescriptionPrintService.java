@@ -19,6 +19,7 @@ import com.lowagie.text.Element;
 import com.lowagie.text.Font;
 import com.lowagie.text.FontFactory;
 import com.lowagie.text.Image;
+import com.lowagie.text.Chunk;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
@@ -246,22 +247,22 @@ public class PrescriptionPrintService {
         com.lowagie.text.pdf.ColumnText.showTextAligned(
                 canvas,
                 Element.ALIGN_LEFT,
-                new Phrase("Dr. " + value(details.doctorName(), "Doctor Name"), pdfFont(22, Font.BOLD, Color.WHITE)),
+                pdfPhrase("Dr. " + value(details.doctorName(), "Doctor Name"), 22, Font.BOLD, Color.WHITE),
                 PDF_SIDE_MARGIN,
                 headerBottom + 70,
                 0);
         com.lowagie.text.pdf.ColumnText.showTextAligned(
                 canvas,
                 Element.ALIGN_LEFT,
-                new Phrase(value(details.qualification(), "QUALIFICATION"), pdfFont(12, Font.BOLD, Color.WHITE)),
+                pdfPhrase(value(details.qualification(), "QUALIFICATION"), 12, Font.BOLD, Color.WHITE),
                 PDF_SIDE_MARGIN,
                 headerBottom + 48,
                 0);
         com.lowagie.text.pdf.ColumnText.showTextAligned(
                 canvas,
                 Element.ALIGN_LEFT,
-                new Phrase(joinParts(details.specialization(), "Reg. No: " + value(details.registrationNumber(), "-")),
-                        pdfFont(8, Font.NORMAL, Color.WHITE)),
+                pdfPhrase(joinParts(details.specialization(), "Reg. No: " + value(details.registrationNumber(), "-")),
+                        8, Font.NORMAL, Color.WHITE),
                 PDF_SIDE_MARGIN,
                 headerBottom + 30,
                 0);
@@ -272,21 +273,21 @@ public class PrescriptionPrintService {
         com.lowagie.text.pdf.ColumnText.showTextAligned(
                 canvas,
                 Element.ALIGN_RIGHT,
-                new Phrase(facilityName, pdfFont(14, Font.BOLD, new Color(15, 118, 110))),
+                pdfPhrase(facilityName, 14, Font.BOLD, new Color(15, 118, 110)),
                 pageWidth - PDF_SIDE_MARGIN,
                 headerBottom + 72,
                 0);
         com.lowagie.text.pdf.ColumnText.showTextAligned(
                 canvas,
                 Element.ALIGN_RIGHT,
-                new Phrase(address, pdfFont(8, Font.NORMAL, PDF_MUTED)),
+                pdfPhrase(address, 8, Font.NORMAL, PDF_MUTED),
                 pageWidth - PDF_SIDE_MARGIN,
                 headerBottom + 52,
                 0);
         com.lowagie.text.pdf.ColumnText.showTextAligned(
                 canvas,
                 Element.ALIGN_RIGHT,
-                new Phrase("Ph: " + phone, pdfFont(8, Font.NORMAL, PDF_MUTED)),
+                pdfPhrase("Ph: " + phone, 8, Font.NORMAL, PDF_MUTED),
                 pageWidth - PDF_SIDE_MARGIN,
                 headerBottom + 36,
                 0);
@@ -538,8 +539,7 @@ public class PrescriptionPrintService {
         qr.setAbsolutePosition(PDF_SIDE_MARGIN + 12, 88);
         canvas.addImage(qr);
 
-        Phrase label = new Phrase("SCAN FOR DIGITAL COPY",
-                pdfFont(7, Font.BOLD, PDF_MUTED));
+        Phrase label = pdfPhrase("SCAN FOR DIGITAL COPY", 7, Font.BOLD, PDF_MUTED);
         com.lowagie.text.pdf.ColumnText.showTextAligned(
                 canvas,
                 Element.ALIGN_LEFT,
@@ -588,9 +588,11 @@ public class PrescriptionPrintService {
             String phone) {}
 
     private void drawPageNumber(PdfWriter writer) {
-        Phrase pageNumber = new Phrase(
+        Phrase pageNumber = pdfPhrase(
                 "Page " + writer.getPageNumber(),
-                pdfFont(7, Font.NORMAL, PDF_MUTED));
+                7,
+                Font.NORMAL,
+                PDF_MUTED);
         com.lowagie.text.pdf.ColumnText.showTextAligned(
                 writer.getDirectContent(),
                 Element.ALIGN_RIGHT,
@@ -702,7 +704,7 @@ public class PrescriptionPrintService {
     }
 
     private PdfPCell headerCell(String value) {
-        PdfPCell cell = new PdfPCell(new Phrase(value, pdfFont(9, Font.BOLD, PDF_TEXT)));
+        PdfPCell cell = new PdfPCell(pdfPhrase(value, 9, Font.BOLD, PDF_TEXT));
         cell.setPadding(6);
         cell.setBorder(Rectangle.TOP | Rectangle.BOTTOM);
         cell.setBorderColor(PDF_LINE);
@@ -710,7 +712,7 @@ public class PrescriptionPrintService {
     }
 
     private PdfPCell bodyCell(String value) {
-        PdfPCell cell = new PdfPCell(new Phrase(value, pdfFont(8, Font.NORMAL, PDF_TEXT)));
+        PdfPCell cell = new PdfPCell(pdfPhrase(value, 8, Font.NORMAL, PDF_TEXT));
         cell.setPadding(6);
         cell.setBorder(Rectangle.BOTTOM);
         cell.setBorderColor(PDF_LIGHT_LINE);
@@ -748,14 +750,48 @@ public class PrescriptionPrintService {
     }
 
     private Paragraph pdfText(String value, int size, int style) {
-        return new Paragraph(value == null ? "" : value, pdfFont(size, style, PDF_TEXT));
+        return new Paragraph(pdfPhrase(value, size, style, PDF_TEXT));
     }
 
     private Font pdfFont(int size, int style, Color color) {
-        if (unicodeBaseFont != null) {
+        return FontFactory.getFont(FontFactory.HELVETICA, size, style, color);
+    }
+
+    private Phrase pdfPhrase(String value, int size, int style, Color color) {
+        String text = value == null ? "" : value;
+        Phrase phrase = new Phrase();
+        StringBuilder chunk = new StringBuilder();
+        Boolean unicodeChunk = null;
+
+        for (int offset = 0; offset < text.length();) {
+            int codePoint = text.codePointAt(offset);
+            boolean unicodeChar = requiresUnicodeFont(codePoint);
+            if (unicodeChunk != null && unicodeChunk != unicodeChar) {
+                phrase.add(new Chunk(chunk.toString(), fontForChunk(unicodeChunk, size, style, color)));
+                chunk.setLength(0);
+            }
+            chunk.appendCodePoint(codePoint);
+            unicodeChunk = unicodeChar;
+            offset += Character.charCount(codePoint);
+        }
+
+        if (!chunk.isEmpty()) {
+            phrase.add(new Chunk(chunk.toString(), fontForChunk(Boolean.TRUE.equals(unicodeChunk), size, style, color)));
+        }
+        return phrase;
+    }
+
+    private Font fontForChunk(boolean unicodeChunk, int size, int style, Color color) {
+        if (unicodeChunk && unicodeBaseFont != null) {
             return new Font(unicodeBaseFont, size, style, color);
         }
-        return FontFactory.getFont(FontFactory.HELVETICA, size, style, color);
+        return pdfFont(size, style, color);
+    }
+
+    private boolean requiresUnicodeFont(int codePoint) {
+        Character.UnicodeBlock block = Character.UnicodeBlock.of(codePoint);
+        return block == Character.UnicodeBlock.DEVANAGARI
+                || block == Character.UnicodeBlock.DEVANAGARI_EXTENDED;
     }
 
     private String resolveUnicodeFontPath() {

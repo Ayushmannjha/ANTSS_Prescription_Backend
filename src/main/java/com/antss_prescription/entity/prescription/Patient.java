@@ -30,7 +30,7 @@ public class Patient {
 	@NotBlank
 	@Size(max = 100)
 	private String patientName;
-	@Column(name = "mobile_number", nullable = false, unique = true, length = 10)
+	@Column(name = "mobile_number", nullable = true,  length = 10)
 	@NotBlank
 	@Pattern(regexp = "^[6-9][0-9]{9}$", message = "must be a valid 10-digit mobile number")
 	private String mobileNumber;
