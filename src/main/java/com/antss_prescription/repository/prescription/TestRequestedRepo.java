@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.UUID;
 
 @Repository
 public interface TestRequestedRepo extends JpaRepository<TestRequested, Integer> {
@@ -17,4 +18,6 @@ public interface TestRequestedRepo extends JpaRepository<TestRequested, Integer>
     List<TestRequested> findByPrescription(Prescription prescription);
     
     void deleteByPrescription(Prescription prescription);
+
+    List<TestRequested> findByDoctorReference_IdAndEntityTypeIgnoreCaseAndEntityId(UUID doctorId, String entityType, Long entityId);
 }

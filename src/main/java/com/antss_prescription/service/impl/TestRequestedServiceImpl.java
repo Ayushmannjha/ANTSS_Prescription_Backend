@@ -16,6 +16,7 @@ import com.antss_prescription.repository.prescription.PrescriptionRepo;
 import com.antss_prescription.repository.prescription.TestRequestedRepo;
 import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.service.TestRequestedService;
+import com.antss_prescription.service.ClinicalAttributionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,7 @@ public class TestRequestedServiceImpl implements TestRequestedService {
     private final DocumentRepo documentRepo;
     private final CloudinaryService cloudinaryService;
     private final AccessControlService accessControl;
+    private final ClinicalAttributionService clinicalAttributionService;
 
     @Override
     public TestRequested save(TestRequested testRequested) {
@@ -71,6 +73,9 @@ public class TestRequestedServiceImpl implements TestRequestedService {
 
             LocalDateTime now = LocalDateTime.now();
             TestRequested testRequested = new TestRequested();
+            clinicalAttributionService.apply(testRequested,
+                    context.prescription() == null ? null : context.prescription().getConsultation().getDoctor(),
+                    context.registration());
             testRequested.setTestName(request.getTestName());
             testRequested.setNotes(request.getNotes());
             testRequested.setPatientRegistration(context.registration());

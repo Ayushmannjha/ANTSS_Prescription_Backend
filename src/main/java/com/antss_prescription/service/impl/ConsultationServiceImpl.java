@@ -32,6 +32,7 @@ import com.antss_prescription.repository.prescription.PrescriptionRepo;
 import com.antss_prescription.exception.ConflictException;
 import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.service.ConsultationService;
+import com.antss_prescription.service.ClinicalAttributionService;
 
 import jakarta.transaction.Transactional;
 
@@ -49,6 +50,7 @@ public class ConsultationServiceImpl implements ConsultationService {
     private final PatientRegistrationRepo registrationRepository;
     private final AccessControlService accessControl;
     private final PrescriptionRepo prescriptionRepository;
+    private final ClinicalAttributionService clinicalAttributionService;
 
 
     @Override
@@ -60,6 +62,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         // Save Chief Complaints
         if (consultation.getCheifComplaints() != null) {
             for (CheifComplaints complaint : consultation.getCheifComplaints()) {
+                clinicalAttributionService.apply(complaint, consultation.getDoctor(), consultation.getPatientRegistration());
                 complaint.setComplaintDate(LocalDateTime.now());
                 complaint.setCreatedAt(LocalDateTime.now());
                 complaint.setUpdatedAt(LocalDateTime.now());
@@ -70,6 +73,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         // Save General Examination
         if (consultation.getGeneralExaminations() != null) {
             for (GeneralExamination examination : consultation.getGeneralExaminations()) {
+                clinicalAttributionService.apply(examination, consultation.getDoctor(), consultation.getPatientRegistration());
                 examination.setConsultation(consultation);
             }
         }
@@ -77,6 +81,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         // Save Diagnosis
         if (consultation.getDiagnoses() != null) {
             for (Diagnosis diagnosis : consultation.getDiagnoses()) {
+                clinicalAttributionService.apply(diagnosis, consultation.getDoctor(), consultation.getPatientRegistration());
                 diagnosis.setDiagnosisDate(LocalDateTime.now());
                 diagnosis.setCreatedAt(LocalDateTime.now());
                 diagnosis.setUpdatedAt(LocalDateTime.now());
@@ -87,6 +92,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         // Save Past Medical History
         if (consultation.getPastMedicalHistories() != null) {
             for (PastMedicalHistory history : consultation.getPastMedicalHistories()) {
+                clinicalAttributionService.apply(history, consultation.getDoctor(), consultation.getPatientRegistration());
                 history.setCreatedAt(LocalDateTime.now());
                 history.setUpdatedAt(LocalDateTime.now());
                 history.setConsultation(consultation);
@@ -159,6 +165,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         if (consultation.getCheifComplaints() != null) {
             existing.getCheifComplaints().clear();
             for (CheifComplaints complaint : consultation.getCheifComplaints()) {
+                clinicalAttributionService.apply(complaint, consultation.getDoctor(), consultation.getPatientRegistration());
                 if (complaint.getCreatedAt() == null) {
                     complaint.setCreatedAt(LocalDateTime.now());
                     complaint.setComplaintDate(LocalDateTime.now());
@@ -173,6 +180,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         if (consultation.getGeneralExaminations() != null) {
             existing.getGeneralExaminations().clear();
             for (GeneralExamination exam : consultation.getGeneralExaminations()) {
+                clinicalAttributionService.apply(exam, consultation.getDoctor(), consultation.getPatientRegistration());
                 exam.setConsultation(existing);
                 existing.getGeneralExaminations().add(exam);
             }
@@ -182,6 +190,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         if (consultation.getDiagnoses() != null) {
             existing.getDiagnoses().clear();
             for (Diagnosis diagnosis : consultation.getDiagnoses()) {
+                clinicalAttributionService.apply(diagnosis, consultation.getDoctor(), consultation.getPatientRegistration());
                 if (diagnosis.getCreatedAt() == null) {
                     diagnosis.setCreatedAt(LocalDateTime.now());
                     diagnosis.setDiagnosisDate(LocalDateTime.now());
@@ -196,6 +205,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         if (consultation.getPastMedicalHistories() != null) {
             existing.getPastMedicalHistories().clear();
             for (PastMedicalHistory history : consultation.getPastMedicalHistories()) {
+                clinicalAttributionService.apply(history, consultation.getDoctor(), consultation.getPatientRegistration());
                 if (history.getCreatedAt() == null) {
                     history.setCreatedAt(LocalDateTime.now());
                 }

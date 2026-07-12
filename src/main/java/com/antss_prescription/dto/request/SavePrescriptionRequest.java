@@ -5,6 +5,7 @@ import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -16,6 +17,12 @@ public class SavePrescriptionRequest {
 
     @Positive
     private Integer consultationId;
+
+    @Pattern(regexp = "(?i)HOSPITAL|CLINIC", message = "entityType must be HOSPITAL or CLINIC")
+    private String entityType;
+
+    @Positive
+    private Long entityId;
 
     // --- Vitals ---
     @PositiveOrZero

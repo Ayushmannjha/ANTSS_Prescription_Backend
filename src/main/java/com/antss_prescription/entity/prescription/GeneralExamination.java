@@ -1,6 +1,8 @@
 package com.antss_prescription.entity.prescription;
 
+import com.antss_prescription.entity.Doctor;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Column;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -18,12 +20,19 @@ import jakarta.persistence.ManyToOne;
 @Setter
 @Getter
 @ToString(exclude = "consultation")
-public class GeneralExamination {
+public class GeneralExamination implements ClinicalAttribution {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private int generalExaminationId;
 	private String generalExamination;
+	@ManyToOne
+	@JoinColumn(name = "doctor_id", nullable = true)
+	private Doctor doctorReference;
+	@Column(name = "entity_type", nullable = true, length = 20)
+	private String entityType;
+	@Column(name = "entity_id", nullable = true)
+	private Long entityId;
 
 	@ManyToOne
 	@JoinColumn(name = "consultation_id")

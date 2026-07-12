@@ -18,8 +18,10 @@ import com.antss_prescription.dto.response.PrescriptionResponse;
 import com.antss_prescription.enums.DiagnosticStatus;
 import com.antss_prescription.entity.Doctor;
 import com.antss_prescription.service.PrescriptionService;
+import com.antss_prescription.service.ClinicalAttributionService;
 import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.exception.ForbiddenException;
+import com.antss_prescription.exception.BusinessException;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     private final DiagnosticOrderRepository diagnosticOrderRepository;
     private final DocumentRepo documentRepo;
     private final AccessControlService accessControl;
+    private final ClinicalAttributionService clinicalAttributionService;
 
 
     @Override
@@ -124,6 +127,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
             if (req.getComplaints() != null) {
                 for (SavePrescriptionRequest.ChiefComplaintRequest c : req.getComplaints()) {
                     CheifComplaints complaint = new CheifComplaints();
+                    clinicalAttributionService.apply(complaint, consultation.getDoctor(), consultation.getPatientRegistration());
                     complaint.setComplaintName(c.getComplaintName());
                     complaint.setFrequency(c.getComplaintFrequency());
                     complaint.setSev(c.getSeverity());
@@ -143,6 +147,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
             if (req.getGeneralExaminations() != null) {
                 for (String exam : req.getGeneralExaminations()) {
                     GeneralExamination examination = new GeneralExamination();
+                    clinicalAttributionService.apply(examination, consultation.getDoctor(), consultation.getPatientRegistration());
                     examination.setGeneralExamination(exam);
                     examination.setConsultation(consultation);
                     consultation.getGeneralExaminations().add(examination);
@@ -156,6 +161,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
             if (req.getPastMedicalHistories() != null) {
                 for (SavePrescriptionRequest.PastMedicalHistoryRequest h : req.getPastMedicalHistories()) {
                     PastMedicalHistory history = new PastMedicalHistory();
+                    clinicalAttributionService.apply(history, consultation.getDoctor(), consultation.getPatientRegistration());
                     history.setAllergeies(h.getAllergies());
                     history.setCurrentMedicine(h.getCurrentMedicine());
                     history.setMedicalHistory(h.getMedicalHistory());
@@ -173,6 +179,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
             if (req.getDiagnoses() != null) {
                 for (SavePrescriptionRequest.DiagnosisRequest d : req.getDiagnoses()) {
                     Diagnosis diagnosis = new Diagnosis();
+                    clinicalAttributionService.apply(diagnosis, consultation.getDoctor(), consultation.getPatientRegistration());
                     diagnosis.setDiagnosisName(d.getDiagnosisName());
                     diagnosis.setDiagnosisCode(d.getDiagnosisCode());
                     diagnosis.setDuration(d.getDiagnosisDuration());
@@ -190,6 +197,10 @@ public class PrescriptionServiceImpl implements PrescriptionService {
 
             consultation = consultationRepository.save(consultation);
         }
+
+        validateRequestedEntity(req.getEntityType(), req.getEntityId(), consultation.getPatientRegistration());
+        applyAttributionToConsultationRecords(consultation);
+        consultationRepository.saveAndFlush(consultation);
 
         // =========================
         // Save Prescription
@@ -266,6 +277,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                     : req.getInvestigations()) {
 
                 Investigations investigation = new Investigations();
+                clinicalAttributionService.apply(investigation, consultation.getDoctor(), consultation.getPatientRegistration());
                 investigation.setInestigationName(i.getInvestigationName());
                 investigation.setNotes(i.getNotes());
                 investigation.setPrescription(prescription);
@@ -295,6 +307,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                     : req.getTestRequested()) {
 
                 TestRequested testRequested = new TestRequested();
+                clinicalAttributionService.apply(testRequested, consultation.getDoctor(), consultation.getPatientRegistration());
                 testRequested.setTestName(t.getTestName());
                 testRequested.setNotes(t.getNotes());
                 testRequested.setPrescription(prescription);
@@ -440,6 +453,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
     accessControl.requirePrescriptionAccess(prescription);
 
     Consultation consultation = prescription.getConsultation();
+    validateRequestedEntity(req.getEntityType(), req.getEntityId(), consultation.getPatientRegistration());
 
     // =========================
     // Update Vitals
@@ -464,6 +478,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
         for (SavePrescriptionRequest.ChiefComplaintRequest c
                 : req.getComplaints()) {
             CheifComplaints complaint = new CheifComplaints();
+            clinicalAttributionService.apply(complaint, consultation.getDoctor(), consultation.getPatientRegistration());
             complaint.setComplaintName(c.getComplaintName());
             complaint.setFrequency(c.getComplaintFrequency());
             complaint.setSev(c.getSeverity());
@@ -484,6 +499,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
         consultation.getGeneralExaminations().clear();
         for (String exam : req.getGeneralExaminations()) {
             GeneralExamination examination = new GeneralExamination();
+            clinicalAttributionService.apply(examination, consultation.getDoctor(), consultation.getPatientRegistration());
             examination.setGeneralExamination(exam);
             examination.setConsultation(consultation);
             consultation.getGeneralExaminations().add(examination);
@@ -499,6 +515,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
         for (SavePrescriptionRequest.PastMedicalHistoryRequest h
                 : req.getPastMedicalHistories()) {
             PastMedicalHistory history = new PastMedicalHistory();
+            clinicalAttributionService.apply(history, consultation.getDoctor(), consultation.getPatientRegistration());
             history.setAllergeies(h.getAllergies());
             history.setCurrentMedicine(h.getCurrentMedicine());
             history.setMedicalHistory(h.getMedicalHistory());
@@ -518,6 +535,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
         for (SavePrescriptionRequest.DiagnosisRequest d
                 : req.getDiagnoses()) {
             Diagnosis diagnosis = new Diagnosis();
+            clinicalAttributionService.apply(diagnosis, consultation.getDoctor(), consultation.getPatientRegistration());
             diagnosis.setDiagnosisName(d.getDiagnosisName());
             diagnosis.setDiagnosisCode(d.getDiagnosisCode());
             diagnosis.setDuration(d.getDiagnosisDuration());
@@ -618,6 +636,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                    : req.getInvestigations()) {
 
                Investigations investigation = new Investigations();
+               clinicalAttributionService.apply(investigation, consultation.getDoctor(), consultation.getPatientRegistration());
                investigation.setInestigationName(i.getInvestigationName());
                investigation.setNotes(i.getNotes());
                investigation.setPrescription(prescription);
@@ -649,6 +668,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                    : req.getTestRequested()) {
 
                TestRequested testRequested = new TestRequested();
+               clinicalAttributionService.apply(testRequested, consultation.getDoctor(), consultation.getPatientRegistration());
                testRequested.setTestName(t.getTestName());
                testRequested.setNotes(t.getNotes());
                testRequested.setPrescription(prescription);
@@ -677,6 +697,46 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
 
     return buildResponse(prescription, consultation, registration, medicines);
 }
+
+    private void validateRequestedEntity(String entityType, Long entityId, PatientRegistration registration) {
+        if (entityType == null && entityId == null) {
+            return;
+        }
+        if (entityType == null || entityId == null) {
+            throw new BusinessException("entityType and entityId must be provided together");
+        }
+
+        String normalizedType = entityType.trim().toUpperCase();
+        boolean matchesHospital = "HOSPITAL".equals(normalizedType)
+                && registration.getHospital() != null
+                && entityId.equals(registration.getHospital().getId());
+        boolean matchesClinic = "CLINIC".equals(normalizedType)
+                && registration.getClinic() != null
+                && entityId.equals(registration.getClinic().getId());
+
+        if (!matchesHospital && !matchesClinic) {
+            throw new BusinessException("entityType and entityId do not match the prescription registration facility");
+        }
+    }
+
+    private void applyAttributionToConsultationRecords(Consultation consultation) {
+        if (consultation.getCheifComplaints() != null) {
+            consultation.getCheifComplaints().forEach(value ->
+                    clinicalAttributionService.apply(value, consultation.getDoctor(), consultation.getPatientRegistration()));
+        }
+        if (consultation.getGeneralExaminations() != null) {
+            consultation.getGeneralExaminations().forEach(value ->
+                    clinicalAttributionService.apply(value, consultation.getDoctor(), consultation.getPatientRegistration()));
+        }
+        if (consultation.getDiagnoses() != null) {
+            consultation.getDiagnoses().forEach(value ->
+                    clinicalAttributionService.apply(value, consultation.getDoctor(), consultation.getPatientRegistration()));
+        }
+        if (consultation.getPastMedicalHistories() != null) {
+            consultation.getPastMedicalHistories().forEach(value ->
+                    clinicalAttributionService.apply(value, consultation.getDoctor(), consultation.getPatientRegistration()));
+        }
+    }
     // ─────────────────────────────────────────────
     // DELETE
     // ─────────────────────────────────────────────

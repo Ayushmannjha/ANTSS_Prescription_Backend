@@ -16,6 +16,7 @@ import com.antss_prescription.repository.prescription.PatientRegistrationRepo;
 import com.antss_prescription.repository.prescription.PrescriptionRepo;
 import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.service.InvestigationsService;
+import com.antss_prescription.service.ClinicalAttributionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,7 @@ public class InvestigationsServiceImpl implements InvestigationsService {
     private final DocumentRepo documentRepo;
     private final CloudinaryService cloudinaryService;
     private final AccessControlService accessControl;
+    private final ClinicalAttributionService clinicalAttributionService;
 
     @Override
     public Investigations save(Investigations investigations) {
@@ -71,6 +73,9 @@ public class InvestigationsServiceImpl implements InvestigationsService {
 
             LocalDateTime now = LocalDateTime.now();
             Investigations investigation = new Investigations();
+            clinicalAttributionService.apply(investigation,
+                    context.prescription() == null ? null : context.prescription().getConsultation().getDoctor(),
+                    context.registration());
             investigation.setInestigationName(request.getInvestigationName());
             investigation.setNotes(request.getNotes());
             investigation.setPatientRegistration(context.registration());
