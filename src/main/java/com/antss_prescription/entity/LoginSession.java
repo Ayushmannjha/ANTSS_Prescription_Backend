@@ -31,6 +31,7 @@ public class LoginSession {
     @Column(nullable = false)
     private boolean expired;
 
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
