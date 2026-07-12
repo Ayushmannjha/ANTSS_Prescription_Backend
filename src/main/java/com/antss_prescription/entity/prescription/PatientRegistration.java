@@ -48,7 +48,6 @@ public class PatientRegistration {
 	@NotBlank
 	@Size(max = 20)
 	private String gender;
-	@NotBlank
 	@Size(max = 20)
 	private String dateOfBirth;
 	@Min(0)

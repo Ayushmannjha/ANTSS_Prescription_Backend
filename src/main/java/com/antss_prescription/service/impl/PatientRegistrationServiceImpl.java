@@ -50,9 +50,6 @@ public class PatientRegistrationServiceImpl implements PatientRegistrationServic
         String mobileNumber = normalize(registration.getMobileNumber());
 
         String dateOfBirth = normalize(registration.getDateOfBirth());
-        if (dateOfBirth.isBlank()) {
-            throw new IllegalArgumentException("Patient date of birth is required");
-        }
         String gender = normalize(registration.getGender());
         if (gender.isBlank()) {
             throw new IllegalArgumentException("Patient gender is required");
@@ -60,7 +57,7 @@ public class PatientRegistrationServiceImpl implements PatientRegistrationServic
 
         registration.setPatientName(normalize(registration.getPatientName()));
         registration.setMobileNumber(mobileNumber.isBlank() ? null : mobileNumber);
-        registration.setDateOfBirth(dateOfBirth);
+        registration.setDateOfBirth(dateOfBirth.isBlank() ? null : dateOfBirth);
         registration.setGender(gender);
         registration.setAddress(normalize(registration.getAddress()));
         registration.setState(normalize(registration.getState()));
