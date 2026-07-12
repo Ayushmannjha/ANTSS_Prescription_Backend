@@ -88,7 +88,7 @@ public class DiagnosticOrderServiceImpl implements DiagnosticOrderService {
     public List<DiagnosticOrderResponse> getByDocument(Integer documentId) {
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document", documentId));
-        accessControl.requirePatientAccess(document.getPatient());
+        accessControl.requireRegistrationAccess(document.getPatientRegistration());
         return repository.findByReportDocumentId(documentId).stream().map(this::map).toList();
     }
 
@@ -146,10 +146,10 @@ public class DiagnosticOrderServiceImpl implements DiagnosticOrderService {
     private Document requireDocumentForRegistration(Integer id, PatientRegistration registration) {
         Document document = documentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Document", id));
-        accessControl.requirePatientAccess(document.getPatient());
-        if (document.getPatient() == null || document.getPatient().getPatientId()
-                != registration.getPatient().getPatientId()) {
-            throw new BusinessException("Report document belongs to a different patient");
+        accessControl.requireRegistrationAccess(document.getPatientRegistration());
+        if (document.getPatientRegistration() == null
+                || document.getPatientRegistration().getRegistrationId() != registration.getRegistrationId()) {
+            throw new BusinessException("Report document belongs to a different registration");
         }
         return document;
     }

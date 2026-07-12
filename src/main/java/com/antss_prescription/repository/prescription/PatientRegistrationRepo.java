@@ -9,7 +9,6 @@ import org.springframework.data.repository.query.Param;
 
 import com.antss_prescription.entity.Clinic;
 import com.antss_prescription.entity.Hospital;
-import com.antss_prescription.entity.prescription.Patient;
 import com.antss_prescription.entity.prescription.PatientRegistration;
 
 
@@ -21,8 +20,6 @@ public interface PatientRegistrationRepo extends JpaRepository<PatientRegistrati
 
 	List<PatientRegistration> findByClinic(Clinic clinic);
 	List<PatientRegistration> findByHospital(Hospital hospital);
-	List<PatientRegistration> findByPatient(Patient patient);
-	boolean existsByPatient(Patient patient);
 	List<PatientRegistration> findByRegistrationNumberStartingWith(String prefix);
 	Optional<PatientRegistration> findByRegistrationNumber(String registrationNumber);
 	@Query("""
@@ -31,9 +28,4 @@ public interface PatientRegistrationRepo extends JpaRepository<PatientRegistrati
 			""")
 	List<PatientRegistration> findAccessible(@Param("hospitalIds") List<Long> hospitalIds,
 			@Param("clinicIds") List<Long> clinicIds);
-	 boolean existsByPatientAndClinic(Patient patient, Clinic clinic);
-	    boolean existsByPatientAndHospital(Patient patient, Hospital hospital);
-
-	    Optional<PatientRegistration> findByPatientAndClinic(Patient patient, Clinic clinic);
-	    Optional<PatientRegistration> findByPatientAndHospital(Patient patient, Hospital hospital);
 }

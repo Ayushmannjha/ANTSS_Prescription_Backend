@@ -110,7 +110,6 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                             .substring(0, 8)
                             .toUpperCase());
             consultation.setPatientRegistration(registration);
-            consultation.setPatient(registration.getPatient());
             consultation.setVitals(vitals);
             consultation.setDoctor(currentDoctor);
             consultation.setAdvice(req.getAdvice());
@@ -233,12 +232,12 @@ public class PrescriptionServiceImpl implements PrescriptionService {
 
         if (req.getDocuments() != null) {
 
-            Patient patient = consultation.getPatient();
+            PatientRegistration registration = consultation.getPatientRegistration();
 
             for (SavePrescriptionRequest.DocumentRequest d
                     : req.getDocuments()) {
 
-                saveOrAttachDocument(d.getFileName(), d.getUrl(), "DOCUMENT", patient, prescription);
+                saveOrAttachDocument(d.getFileName(), d.getUrl(), "DOCUMENT", registration, prescription);
             }
         }
 
@@ -279,7 +278,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                         i.getDocumentFileName(),
                         i.getDocumentUrl(),
                         "INVESTIGATION",
-                        consultation.getPatient(),
+                        consultation.getPatientRegistration(),
                         prescription));
 
                 investigationsRepo.save(investigation);
@@ -305,7 +304,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                         t.getDocumentFileName(),
                         t.getDocumentUrl(),
                         "TEST_REQUESTED",
-                        consultation.getPatient(),
+                        consultation.getPatientRegistration(),
                         prescription));
                 testRequested.setCreateAt(LocalDateTime.now());
                 testRequested.setUpdatedAt(LocalDateTime.now());
@@ -385,7 +384,7 @@ public class PrescriptionServiceImpl implements PrescriptionService {
 
         var user = accessControl.currentUser();
         return prescriptionRepository
-                .findByConsultation_Patient_PatientId(patientId)
+                .findByConsultation_PatientRegistration_RegistrationId(patientId)
                 .stream()
                 .filter(prescription -> accessControl.canAccess(prescription, user))
                 .map(prescription -> {
@@ -579,14 +578,14 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
 
     if (req.getDocuments() != null) {
 
-        Patient patient = consultation.getPatient();
+        PatientRegistration registration = consultation.getPatientRegistration();
 
         documentRepo.deleteByPrescription(prescription);
 
         for (SavePrescriptionRequest.DocumentRequest d
                 : req.getDocuments()) {
 
-            saveOrAttachDocument(d.getFileName(), d.getUrl(), "DOCUMENT", patient, prescription);
+            saveOrAttachDocument(d.getFileName(), d.getUrl(), "DOCUMENT", registration, prescription);
         }
     }
 
@@ -631,7 +630,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                        i.getDocumentFileName(),
                        i.getDocumentUrl(),
                        "INVESTIGATION",
-                       consultation.getPatient(),
+                       consultation.getPatientRegistration(),
                        prescription));
 
                investigationsRepo.save(investigation);
@@ -659,7 +658,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                        t.getDocumentFileName(),
                        t.getDocumentUrl(),
                        "TEST_REQUESTED",
-                       consultation.getPatient(),
+                       consultation.getPatientRegistration(),
                        prescription));
                testRequested.setCreateAt(LocalDateTime.now());
                testRequested.setUpdatedAt(LocalDateTime.now());
@@ -770,7 +769,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
 
         var user = accessControl.currentUser();
         return prescriptionRepository
-                .findByConsultation_Patient_PatientId(patientId)
+                .findByConsultation_PatientRegistration_RegistrationId(patientId)
                 .stream()
                 .filter(prescription -> accessControl.canAccess(prescription, user))
                 .map(this::buildDetailedResponse)
@@ -790,7 +789,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
                 .prescriptionId(prescription.getPrescriptionId())
                 .consultationId(consultation.getConsultationId())
                 .consultationNumber(consultation.getConsultationNumber())
-                .patientName(registration.getPatient().getPatientName())
+                .patientName(registration.getPatientName())
                 .notes(prescription.getNotes())
                 .createdAt(prescription.getCreatedAt())
                 .medicines(medicines.stream()
@@ -880,12 +879,12 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
         // Patient
         // =========================
 
-        if (consultation.getPatient() != null) {
-            consultationResponse.setPatientId(consultation.getPatient().getPatientId());
-            consultationResponse.setPatientName(consultation.getPatient().getPatientName());
-            consultationResponse.setMobileNumber(consultation.getPatient().getMobileNumber());
-            consultationResponse.setGender(consultation.getPatient().getGender());
-            consultationResponse.setAge(consultation.getPatient().getAge());
+        if (registration != null) {
+            consultationResponse.setPatientId(registration.getRegistrationId());
+            consultationResponse.setPatientName(registration.getPatientName());
+            consultationResponse.setMobileNumber(registration.getMobileNumber());
+            consultationResponse.setGender(registration.getGender());
+            consultationResponse.setAge(registration.getAge());
         }
 
         // =========================
@@ -1101,7 +1100,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
             String fileName,
             String url,
             String documentType,
-            Patient patient,
+            PatientRegistration registration,
             Prescription prescription) {
 
         if (url == null || url.isBlank()) {
@@ -1112,7 +1111,7 @@ public PrescriptionResponse updatePrescription(int prescriptionId,
         document.setFileName(fileName == null || fileName.isBlank() ? "document" : fileName.trim());
         document.setUrl(url.trim());
         document.setDocumentType(documentType);
-        document.setPatient(patient);
+        document.setPatientRegistration(registration);
         document.setPrescription(prescription);
         return documentRepo.save(document);
     }

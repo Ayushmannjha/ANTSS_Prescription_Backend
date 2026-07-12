@@ -16,16 +16,16 @@ import jakarta.transaction.Transactional;
 @Repository
 public interface DocumentRepo extends JpaRepository<Document, Integer> {
 
-    @Query("SELECT d FROM Document d WHERE d.patient.patientId = :patientId")
-    List<Document> findByPatientId(@Param("patientId") Integer patientId);
+    @Query("SELECT d FROM Document d WHERE d.patientRegistration.registrationId = :registrationId")
+    List<Document> findByPatientId(@Param("registrationId") Integer registrationId);
 
-    @Query("SELECT d FROM Document d WHERE d.id = :documentId AND d.patient.patientId = :patientId")
-    Optional<Document> findByIdAndPatientId(@Param("documentId") Integer documentId, @Param("patientId") Integer patientId);
+    @Query("SELECT d FROM Document d WHERE d.id = :documentId AND d.patientRegistration.registrationId = :registrationId")
+    Optional<Document> findByIdAndPatientId(@Param("documentId") Integer documentId, @Param("registrationId") Integer registrationId);
 
-	void deleteByPatientPatientId(int patientId);
+	void deleteByPatientRegistrationRegistrationId(int registrationId);
 
-	List<Document> findByPatientPatientId(int patientId);
-	boolean existsByPatientPatientId(int patientId);
+	List<Document> findByPatientRegistrationRegistrationId(int registrationId);
+	boolean existsByPatientRegistrationRegistrationId(int registrationId);
     Optional<Document> findByUrl(String url);
 
     List<Document> getDocumentsByPrescription(Prescription prescription);

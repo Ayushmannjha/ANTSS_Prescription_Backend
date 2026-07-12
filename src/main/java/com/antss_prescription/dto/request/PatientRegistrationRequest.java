@@ -8,8 +8,6 @@ import lombok.Data;
 
 @Data
 public class PatientRegistrationRequest {
-    @Positive
-    private Integer patientId;
     @Valid
     private PatientRequest patient;
     @Positive

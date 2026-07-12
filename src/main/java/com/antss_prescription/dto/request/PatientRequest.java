@@ -9,12 +9,14 @@ import lombok.Data;
 
 @Data
 public class PatientRequest {
-    @NotBlank @Size(max = 100)
-    private String patientName;
     @NotBlank
-    @Pattern(regexp = "^[6-9][0-9]{9}$", message = "must be a valid 10-digit mobile number")
+    @Size(max = 100)
+    private String patientName;
+
+    @Pattern(regexp = "^$|^[6-9][0-9]{9}$", message = "must be a valid 10-digit mobile number")
     private String mobileNumber;
-    @NotBlank @Size(max = 20)
+    @NotBlank
+    @Size(max = 20)
     private String gender;
     @Size(max = 20)
     private String dateOfBirth;

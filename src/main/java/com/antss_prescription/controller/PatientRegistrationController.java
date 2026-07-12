@@ -46,7 +46,16 @@ public class PatientRegistrationController {
         PatientRegistrationResponse response = new PatientRegistrationResponse();
         response.setRegistrationId(savedRegistration.getRegistrationId());
         response.setRegistrationNumber(savedRegistration.getRegistrationNumber());
-        response.setPatient(savedRegistration.getPatient());
+        response.setPatientId(savedRegistration.getRegistrationId());
+        response.setPatientName(savedRegistration.getPatientName());
+        response.setMobileNumber(savedRegistration.getMobileNumber());
+        response.setGender(savedRegistration.getGender());
+        response.setDateOfBirth(savedRegistration.getDateOfBirth());
+        response.setAge(savedRegistration.getAge());
+        response.setAddress(savedRegistration.getAddress());
+        response.setState(savedRegistration.getState());
+        response.setCity(savedRegistration.getCity());
+        response.setPincode(savedRegistration.getPincode());
         response.setStatus(savedRegistration.getStatus());
         response.setCreatedAt(savedRegistration.getCreatedAt());
         response.setUpdatedAt(savedRegistration.getUpdatedAt());
