@@ -113,4 +113,16 @@ public final class ClinicalRequestMapper {
         }
         return consultation;
     }
+
+    public static Vitals toVitals(UpdateVitalsRequest request) {
+        Vitals vitals = new Vitals();
+        vitals.setHeight(request.getHeight());
+        vitals.setWeight(request.getWeight());
+        vitals.setTemprature(request.getTemprature());
+        vitals.setPulse(request.getPulse());
+        vitals.setSpo2(request.getSpo2());
+        vitals.setBp(request.getBp());
+        vitals.setRespiratoryRate(request.getRespiratoryRate());
+        return vitals;
+    }
 }

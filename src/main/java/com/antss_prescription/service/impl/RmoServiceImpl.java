@@ -14,8 +14,6 @@ import com.antss_prescription.repository.UserSubscriptionRepository;
 import com.antss_prescription.repository.UserRepository;
 import com.antss_prescription.repository.LoginSessionRepository;
 import com.antss_prescription.service.RmoService;
-import com.antss_prescription.service.EmailService;
-import com.antss_prescription.security.PasswordResetTokenService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,7 +21,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -43,9 +40,7 @@ public class RmoServiceImpl implements RmoService {
     private final LoginCredentialRepository loginCredentialRepository;
     private final LoginSessionRepository loginSessionRepository;
     private final PasswordEncoder passwordEncoder;
-    private final EmailService emailService;
     private final ModelMapper modelMapper;
-    private final PasswordResetTokenService passwordResetTokenService;
 
     @Override
     public RmoResponse addRmo(CreateRmoRequest request, UUID userId) {
@@ -59,8 +54,12 @@ public class RmoServiceImpl implements RmoService {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BusinessException("Email already registered: " + request.getEmail());
         }
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new BusinessException("Password is required when creating an RMO");
+        }
 
-        Rmo rmo = modelMapper.map(request, Rmo.class);
+        Rmo rmo = new Rmo();
+        mapRequestFields(request, rmo);
         rmo.setStatus(EntityStatus.ACTIVE);
 
         User owner;
@@ -111,9 +110,6 @@ public class RmoServiceImpl implements RmoService {
         if (activeSubs.isEmpty()) {
             throw new BusinessException("An active paid subscription is required to add an RMO");
         }
-        java.time.LocalDate subEndDate = activeSubs.get(0).getEndDate();
-
-        String plainPassword = generateSecurePassword(12);
         User rmoUser = new User();
         rmoUser.setFullName(request.getRmoName());
         rmoUser.setEmail(request.getEmail());
@@ -126,23 +122,12 @@ public class RmoServiceImpl implements RmoService {
         LoginCredential credential = new LoginCredential();
         credential.setUser(savedRmoUser);
         credential.setUsername(request.getEmail());
-        credential.setPasswordHash(passwordEncoder.encode(plainPassword));
+        credential.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         loginCredentialRepository.save(credential);
 
         rmo.setUser(savedRmoUser);
 
         Rmo saved = rmoRepository.save(rmo);
-        String setupToken = passwordResetTokenService.issue(savedRmoUser);
-
-        emailService.sendCredentialsEmail(
-                request.getEmail(),
-                request.getRmoName(),
-                request.getEmail(),
-                "RMO",
-                subEndDate,
-                UserType.RMO,
-                setupToken
-        );
 
         log.info("Rmo created: {}", saved.getRmoName());
         return mapToResponse(saved);
@@ -156,7 +141,7 @@ public class RmoServiceImpl implements RmoService {
             throw new BusinessException("Email already registered: " + request.getEmail());
         }
 
-        modelMapper.map(request, rmo);
+        mapRequestFields(request, rmo);
         syncRmoUser(rmo, request);
 
         Rmo saved = rmoRepository.save(rmo);
@@ -256,6 +241,14 @@ public class RmoServiceImpl implements RmoService {
         });
     }
 
+    private void mapRequestFields(CreateRmoRequest request, Rmo rmo) {
+        rmo.setRmoName(request.getRmoName());
+        rmo.setEmail(request.getEmail());
+        rmo.setMobileNumber(request.getMobileNumber());
+        rmo.setEmployeeCode(request.getEmployeeCode());
+        rmo.setRole(request.getRole());
+    }
+
     private RmoResponse mapToResponse(Rmo rmo) {
         RmoResponse response = modelMapper.map(rmo, RmoResponse.class);
         if (rmo.getUser() != null) {
@@ -270,14 +263,4 @@ public class RmoServiceImpl implements RmoService {
         return response;
     }
 
-
-    private String generateSecurePassword(int length) {
-        final String CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$!";
-        SecureRandom random = new SecureRandom();
-        StringBuilder sb = new StringBuilder(length);
-        for (int i = 0; i < length; i++) {
-            sb.append(CHARS.charAt(random.nextInt(CHARS.length())));
-        }
-        return sb.toString();
-    }
 }

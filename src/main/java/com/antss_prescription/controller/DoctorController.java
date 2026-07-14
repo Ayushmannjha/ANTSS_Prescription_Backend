@@ -55,10 +55,12 @@ public class DoctorController {
     }
 
     @GetMapping
-    @Operation(summary = "List all doctors belonging to the logged-in Hospital or Clinic")
-    public ResponseEntity<ApiResponse<List<DoctorResponse>>> listDoctors() {
+    @Operation(summary = "List doctors by hospital or clinic accessible to the logged-in user")
+    public ResponseEntity<ApiResponse<List<DoctorResponse>>> listDoctors(
+            @RequestParam(required = false) Long hospitalId,
+            @RequestParam(required = false) Long clinicId) {
         UUID userId = getCurrentUserId();
-        List<DoctorResponse> responses = doctorService.listDoctors(userId);
+        List<DoctorResponse> responses = doctorService.listDoctors(userId, hospitalId, clinicId);
         return ResponseEntity.ok(ApiResponse.success("Doctors fetched successfully", responses));
     }
 

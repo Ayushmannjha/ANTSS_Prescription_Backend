@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import com.antss_prescription.dto.response.ConsultationResponse;
 import com.antss_prescription.dto.request.ConsultationRequest;
 import com.antss_prescription.dto.request.ClinicalRequestMapper;
+import com.antss_prescription.dto.request.UpdateVitalsRequest;
 import com.antss_prescription.entity.prescription.Consultation;
 import com.antss_prescription.service.ConsultationService;
 
@@ -51,6 +52,14 @@ public class ConsultationController {
             @Valid @RequestBody ConsultationRequest request) {
         return ResponseEntity.ok(consultationService.updateConsultation(
                 consultationId, ClinicalRequestMapper.toConsultation(request)));
+    }
+
+    @RequestMapping(value = "/{consultationId}/vitals", method = {RequestMethod.POST, RequestMethod.PUT})
+    public ResponseEntity<ConsultationResponse> updateVitals(
+            @PathVariable Integer consultationId,
+            @Valid @RequestBody UpdateVitalsRequest request) {
+        return ResponseEntity.ok(consultationService.updateVitals(
+                consultationId, ClinicalRequestMapper.toVitals(request)));
     }
 
     @DeleteMapping("/{consultationId}")

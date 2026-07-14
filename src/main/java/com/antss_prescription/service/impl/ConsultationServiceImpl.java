@@ -30,6 +30,7 @@ import com.antss_prescription.repository.prescription.VitalsRepo;
 import com.antss_prescription.repository.prescription.PatientRegistrationRepo;
 import com.antss_prescription.repository.prescription.PrescriptionRepo;
 import com.antss_prescription.exception.ConflictException;
+import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.service.ConsultationService;
 import com.antss_prescription.service.ClinicalAttributionService;
@@ -229,6 +230,32 @@ public class ConsultationServiceImpl implements ConsultationService {
         existing.setUpdatedAt(LocalDateTime.now());
 
         return mapToResponse(consultationRepo.save(existing));
+    }
+
+    @Override
+    @Transactional
+    public ConsultationResponse updateVitals(Integer consultationId, Vitals requestVitals) {
+        Consultation consultation = consultationRepo.findById(consultationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Consultation", consultationId));
+        accessControl.requireConsultationAccess(consultation);
+
+        Vitals vitals = consultation.getVitals();
+        if (vitals == null) {
+            vitals = new Vitals();
+            vitals.setCreatedAt(LocalDateTime.now());
+        }
+
+        vitals.setHeight(requestVitals.getHeight());
+        vitals.setWeight(requestVitals.getWeight());
+        vitals.setTemprature(requestVitals.getTemprature());
+        vitals.setPulse(requestVitals.getPulse());
+        vitals.setSpo2(requestVitals.getSpo2());
+        vitals.setBp(requestVitals.getBp());
+        vitals.setRespiratoryRate(requestVitals.getRespiratoryRate());
+
+        consultation.setVitals(vitalsRepository.save(vitals));
+        consultation.setUpdatedAt(LocalDateTime.now());
+        return mapToResponse(consultationRepo.save(consultation));
     }
 
     @Override

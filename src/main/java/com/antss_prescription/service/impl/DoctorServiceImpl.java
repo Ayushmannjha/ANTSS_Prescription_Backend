@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 public class DoctorServiceImpl implements DoctorService {
 
     private final DoctorRepository doctorRepository;
+    private final RmoRepository rmoRepository;
     private final HospitalRepository hospitalRepository;
     private final ClinicRepository clinicRepository;
     private final UserRepository userRepository;
@@ -270,24 +271,81 @@ public class DoctorServiceImpl implements DoctorService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<DoctorResponse> listDoctors(UUID userId) {
+    public List<DoctorResponse> listDoctors(UUID userId, Long hospitalId, Long clinicId) {
+        if (hospitalId != null && clinicId != null) {
+            throw new BusinessException("hospitalId and clinicId cannot both be provided");
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
 
         List<Doctor> doctors = new ArrayList<>();
-        if (user.getUserType() == UserType.HOSPITAL) {
+
+        if (hospitalId != null) {
+            Hospital hospital = hospitalRepository.findById(hospitalId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Hospital", hospitalId));
+            verifyHospitalAccess(user, hospital);
+            doctors.addAll(doctorRepository.findByHospital(hospital));
+        } else if (clinicId != null) {
+            Clinic clinic = clinicRepository.findById(clinicId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Clinic", clinicId));
+            verifyClinicAccess(user, clinic);
+            doctors.addAll(doctorRepository.findByClinic(clinic));
+        } else if (user.getUserType() == UserType.HOSPITAL) {
             List<Hospital> hospitals = hospitalRepository.findByUserIdOrOwnerId(userId, userId);
             for (Hospital h : hospitals) {
                 doctors.addAll(doctorRepository.findByHospital(h));
             }
-        } else {
+        } else if (user.getUserType() == UserType.CLINIC) {
             List<Clinic> clinics = clinicRepository.findByUserIdOrOwnerId(userId, userId);
             for (Clinic c : clinics) {
                 doctors.addAll(doctorRepository.findByClinic(c));
             }
+        } else if (user.getUserType() == UserType.RMO) {
+            Rmo rmo = rmoRepository.findByUserId(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("RMO", userId));
+            if (rmo.getHospital() != null) {
+                doctors.addAll(doctorRepository.findByHospital(rmo.getHospital()));
+            } else if (rmo.getClinic() != null) {
+                doctors.addAll(doctorRepository.findByClinic(rmo.getClinic()));
+            }
         }
 
         return doctors.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    private void verifyHospitalAccess(User user, Hospital hospital) {
+        UUID userId = user.getId();
+        boolean hasAccess = user.getUserType() == UserType.HOSPITAL
+                && (userId.equals(hospital.getUser().getId())
+                || (hospital.getOwner() != null && userId.equals(hospital.getOwner().getId())));
+
+        if (user.getUserType() == UserType.RMO) {
+            hasAccess = rmoRepository.findByUserId(userId)
+                    .map(rmo -> rmo.getHospital() != null && hospital.getId().equals(rmo.getHospital().getId()))
+                    .orElse(false);
+        }
+
+        if (!hasAccess) {
+            throw new BusinessException("Unauthorized hospital access");
+        }
+    }
+
+    private void verifyClinicAccess(User user, Clinic clinic) {
+        UUID userId = user.getId();
+        boolean hasAccess = user.getUserType() == UserType.CLINIC
+                && (userId.equals(clinic.getUser().getId())
+                || (clinic.getOwner() != null && userId.equals(clinic.getOwner().getId())));
+
+        if (user.getUserType() == UserType.RMO) {
+            hasAccess = rmoRepository.findByUserId(userId)
+                    .map(rmo -> rmo.getClinic() != null && clinic.getId().equals(rmo.getClinic().getId()))
+                    .orElse(false);
+        }
+
+        if (!hasAccess) {
+            throw new BusinessException("Unauthorized clinic access");
+        }
     }
 
     @Override
