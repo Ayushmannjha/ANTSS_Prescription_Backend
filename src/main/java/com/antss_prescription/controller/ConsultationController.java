@@ -9,12 +9,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.antss_prescription.dto.response.ConsultationResponse;
-import com.antss_prescription.dto.response.DoctorOptionResponseDto;
-import com.antss_prescription.dto.response.VitalsResponseDto;
 import com.antss_prescription.dto.request.ConsultationRequest;
-import com.antss_prescription.dto.request.CreateConsultRequestDto;
 import com.antss_prescription.dto.request.ClinicalRequestMapper;
-import com.antss_prescription.dto.request.VitalsRequestDto;
+import com.antss_prescription.dto.request.UpdateVitalsRequest;
 import com.antss_prescription.entity.prescription.Consultation;
 import com.antss_prescription.service.ConsultationService;
 
@@ -49,48 +46,20 @@ public class ConsultationController {
         return ResponseEntity.ok(consultationService.getConsultationsByDoctor(doctorId));
     }
 
-    @GetMapping("/requests/my")
-    public ResponseEntity<List<ConsultationResponse>> getMyConsultationRequests() {
-        return ResponseEntity.ok(consultationService.getMyConsultationRequests());
-    }
-
-    @GetMapping("/registrations/{registrationId}/available-doctors")
-    public ResponseEntity<List<DoctorOptionResponseDto>> getAvailableDoctorsForRegistration(
-            @PathVariable Integer registrationId) {
-        return ResponseEntity.ok(consultationService.getAvailableDoctorsForRegistration(registrationId));
-    }
-
-    @PostMapping("/registrations/{registrationId}/vitals")
-    public ResponseEntity<VitalsResponseDto> saveVitals(
-            @PathVariable Integer registrationId,
-            @Valid @RequestBody VitalsRequestDto request) {
-        return ResponseEntity.ok(consultationService.saveVitals(registrationId, request));
-    }
-
-    @PostMapping("/requests")
-    public ResponseEntity<ConsultationResponse> createConsultRequest(
-            @Valid @RequestBody CreateConsultRequestDto request) {
-        return ResponseEntity.ok(consultationService.createConsultRequest(request));
-    }
-
-    @PatchMapping("/{consultationId}/start")
-    public ResponseEntity<ConsultationResponse> startConsultation(
-            @PathVariable Integer consultationId) {
-        return ResponseEntity.ok(consultationService.startConsultation(consultationId));
-    }
-
-    @PatchMapping("/{consultationId}/complete")
-    public ResponseEntity<ConsultationResponse> completeConsultation(
-            @PathVariable Integer consultationId) {
-        return ResponseEntity.ok(consultationService.completeConsultation(consultationId));
-    }
-
     @PutMapping("/{consultationId}")
     public ResponseEntity<ConsultationResponse> updateConsultation(
             @PathVariable Integer consultationId,
             @Valid @RequestBody ConsultationRequest request) {
         return ResponseEntity.ok(consultationService.updateConsultation(
                 consultationId, ClinicalRequestMapper.toConsultation(request)));
+    }
+
+    @RequestMapping(value = "/{consultationId}/vitals", method = {RequestMethod.POST, RequestMethod.PUT})
+    public ResponseEntity<ConsultationResponse> updateVitals(
+            @PathVariable Integer consultationId,
+            @Valid @RequestBody UpdateVitalsRequest request) {
+        return ResponseEntity.ok(consultationService.updateVitals(
+                consultationId, ClinicalRequestMapper.toVitals(request)));
     }
 
     @DeleteMapping("/{consultationId}")
