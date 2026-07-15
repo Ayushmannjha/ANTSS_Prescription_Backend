@@ -3,6 +3,9 @@ package com.antss_prescription.entity.prescription;
 import java.time.LocalDateTime;
 
 import com.antss_prescription.entity.Doctor;
+import com.antss_prescription.entity.Rmo;
+import com.antss_prescription.enums.ConsultationPriority;
+import com.antss_prescription.enums.ConsultationStatus;
 
 import jakarta.persistence.*;
 import jakarta.validation.Valid;
@@ -54,6 +57,34 @@ public class Consultation {
     @ManyToOne
     @JoinColumn(name = "vitals_id")
     private Vitals vitals;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = true)
+    private ConsultationStatus status = ConsultationStatus.IN_PROGRESS;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = true)
+    private ConsultationPriority priority;
+
+    @Size(max = 1000)
+    @Column(nullable = true, length = 1000)
+    private String consultReason;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "requested_by_rmo_id", nullable = true)
+    private Rmo requestedBy;
+
+    @Column(nullable = true)
+    private LocalDateTime requestedAt;
+
+    @Column(nullable = true)
+    private LocalDateTime acceptedAt;
+
+    @Column(nullable = true)
+    private LocalDateTime completedAt;
+
+    @Column(nullable = true)
+    private LocalDateTime cancelledAt;
 
     
     @Size(max = 2000)

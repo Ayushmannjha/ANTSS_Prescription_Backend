@@ -9,17 +9,25 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.antss_prescription.dto.request.CreateConsultRequestDto;
+import com.antss_prescription.dto.request.VitalsRequestDto;
 import com.antss_prescription.dto.response.ConsultationResponse;
+import com.antss_prescription.dto.response.DoctorOptionResponseDto;
+import com.antss_prescription.dto.response.VitalsResponseDto;
 import com.antss_prescription.entity.Doctor;
+import com.antss_prescription.entity.Rmo;
 import com.antss_prescription.entity.prescription.CheifComplaints;
 import com.antss_prescription.entity.prescription.Consultation;
 import com.antss_prescription.entity.prescription.Diagnosis;
 import com.antss_prescription.entity.prescription.GeneralExamination;
 import com.antss_prescription.entity.prescription.PastMedicalHistory;
+import com.antss_prescription.entity.prescription.PatientRegistration;
 import com.antss_prescription.entity.prescription.Vitals;
+import com.antss_prescription.enums.ConsultationPriority;
+import com.antss_prescription.enums.ConsultationStatus;
+import com.antss_prescription.enums.EntityStatus;
 import com.antss_prescription.repository.DoctorRepository;
 import com.antss_prescription.repository.prescription.CheifComplaintsRepo;
 import com.antss_prescription.repository.prescription.ConsultationRepo;
@@ -34,6 +42,7 @@ import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.security.AccessControlService;
 import com.antss_prescription.service.ConsultationService;
 import com.antss_prescription.service.ClinicalAttributionService;
+import com.antss_prescription.websocket.ConsultationRequestWebSocketHandler;
 
 import jakarta.transaction.Transactional;
 
@@ -52,6 +61,7 @@ public class ConsultationServiceImpl implements ConsultationService {
     private final AccessControlService accessControl;
     private final PrescriptionRepo prescriptionRepository;
     private final ClinicalAttributionService clinicalAttributionService;
+    private final ConsultationRequestWebSocketHandler consultationRequestWebSocketHandler;
 
 
     @Override
@@ -107,6 +117,12 @@ public class ConsultationServiceImpl implements ConsultationService {
             consultation.setVitals(vitals);
         }
 
+        if (consultation.getStatus() == null) {
+            consultation.setStatus(ConsultationStatus.IN_PROGRESS);
+        }
+        if (consultation.getAcceptedAt() == null && consultation.getStatus() == ConsultationStatus.IN_PROGRESS) {
+            consultation.setAcceptedAt(LocalDateTime.now());
+        }
         consultation.setCreatedAt(LocalDateTime.now());
         consultation.setUpdatedAt(LocalDateTime.now());
 
@@ -149,6 +165,119 @@ public class ConsultationServiceImpl implements ConsultationService {
         }
 
         return new ArrayList<>(latestPerPatient.values());
+    }
+
+    @Override
+    public List<ConsultationResponse> getMyConsultationRequests() {
+        Doctor doctor = accessControl.requireCurrentDoctor();
+        return consultationRepo.findDoctorDashboardConsultations(
+                        doctor.getId(),
+                        List.of(ConsultationStatus.REQUESTED, ConsultationStatus.IN_PROGRESS))
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    @Override
+    public List<DoctorOptionResponseDto> getAvailableDoctorsForRegistration(Integer registrationId) {
+        PatientRegistration registration = registrationRepository.findById(registrationId)
+                .orElseThrow(() -> new RuntimeException("Patient registration not found"));
+        accessControl.requireRegistrationAccess(registration);
+
+        List<Doctor> doctors = registration.getHospital() != null
+                ? doctorRepository.findByHospitalAndStatus(registration.getHospital(), EntityStatus.ACTIVE)
+                : doctorRepository.findByClinicAndStatus(registration.getClinic(), EntityStatus.ACTIVE);
+        return doctors.stream().map(this::mapDoctorOption).toList();
+    }
+
+    @Override
+    @Transactional
+    public VitalsResponseDto saveVitals(Integer registrationId, VitalsRequestDto request) {
+        Rmo rmo = accessControl.requireCurrentRmo();
+        PatientRegistration registration = registrationRepository.findById(registrationId)
+                .orElseThrow(() -> new RuntimeException("Patient registration not found"));
+        accessControl.requireRegistrationAccess(registration);
+        requireRmoForRegistration(rmo, registration);
+
+        Vitals vitals = new Vitals();
+        applyVitals(vitals, request);
+        vitals.setPatientRegistration(registration);
+        vitals.setRecordedBy(rmo);
+        return mapVitals(vitalsRepository.save(vitals));
+    }
+
+    @Override
+    @Transactional
+    public ConsultationResponse createConsultRequest(CreateConsultRequestDto request) {
+        Rmo rmo = accessControl.requireCurrentRmo();
+        PatientRegistration registration = registrationRepository.findById(request.getRegistrationId())
+                .orElseThrow(() -> new RuntimeException("Patient registration not found"));
+        accessControl.requireRegistrationAccess(registration);
+        requireRmoForRegistration(rmo, registration);
+
+        Doctor doctor = doctorRepository.findById(request.getDoctorId())
+                .orElseThrow(() -> new RuntimeException("Doctor not found"));
+        accessControl.requireDoctorForRegistration(doctor, registration);
+
+        Consultation consultation = new Consultation();
+        consultation.setPatientRegistration(registration);
+        consultation.setDoctor(doctor);
+        consultation.setStatus(ConsultationStatus.REQUESTED);
+        consultation.setPriority(request.getPriority() == null ? ConsultationPriority.ROUTINE : request.getPriority());
+        consultation.setConsultReason(request.getConsultReason());
+        consultation.setRequestedBy(rmo);
+        consultation.setRequestedAt(LocalDateTime.now());
+        consultation.setCreatedAt(LocalDateTime.now());
+        consultation.setUpdatedAt(LocalDateTime.now());
+
+        if (request.getVitalId() != null) {
+            Vitals vitals = vitalsRepository.findById(request.getVitalId())
+                    .orElseThrow(() -> new RuntimeException("Vitals not found"));
+            if (vitals.getPatientRegistration() == null
+                    || vitals.getPatientRegistration().getRegistrationId() != registration.getRegistrationId()) {
+                throw new ConflictException("Vitals do not belong to this patient registration");
+            }
+            consultation.setVitals(vitals);
+        } else {
+            vitalsRepository.findByPatientRegistrationRegistrationIdOrderByCreatedAtDesc(registration.getRegistrationId())
+                    .stream()
+                    .findFirst()
+                    .ifPresent(consultation::setVitals);
+        }
+
+        Consultation saved = consultationRepo.save(consultation);
+        consultationRequestWebSocketHandler.publishConsultationRequestCreated(saved);
+        return mapToResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public ConsultationResponse startConsultation(Integer consultationId) {
+        Consultation consultation = consultationRepo.findById(consultationId)
+                .orElseThrow(() -> new RuntimeException("Consultation not found with id : " + consultationId));
+        Doctor currentDoctor = accessControl.requireCurrentDoctor();
+        requireAssignedDoctor(consultation, currentDoctor);
+
+        if (consultation.getStatus() == null || consultation.getStatus() == ConsultationStatus.REQUESTED) {
+            consultation.setStatus(ConsultationStatus.IN_PROGRESS);
+            consultation.setAcceptedAt(LocalDateTime.now());
+            consultation.setUpdatedAt(LocalDateTime.now());
+        }
+        return mapToResponse(consultationRepo.save(consultation));
+    }
+
+    @Override
+    @Transactional
+    public ConsultationResponse completeConsultation(Integer consultationId) {
+        Consultation consultation = consultationRepo.findById(consultationId)
+                .orElseThrow(() -> new RuntimeException("Consultation not found with id : " + consultationId));
+        Doctor currentDoctor = accessControl.requireCurrentDoctor();
+        requireAssignedDoctor(consultation, currentDoctor);
+
+        consultation.setStatus(ConsultationStatus.COMPLETED);
+        consultation.setCompletedAt(LocalDateTime.now());
+        consultation.setUpdatedAt(LocalDateTime.now());
+        return mapToResponse(consultationRepo.save(consultation));
     }
 
     @Override
@@ -280,6 +409,18 @@ public class ConsultationServiceImpl implements ConsultationService {
         response.setFollowUpDate(c.getFollowUpDate());
         response.setCreatedAt(c.getCreatedAt());
         response.setUpdatedAt(c.getUpdatedAt());
+        response.setStatus(c.getStatus());
+        response.setPriority(c.getPriority());
+        response.setConsultReason(c.getConsultReason());
+        response.setRequestedAt(c.getRequestedAt());
+        response.setAcceptedAt(c.getAcceptedAt());
+        response.setCompletedAt(c.getCompletedAt());
+        response.setCancelledAt(c.getCancelledAt());
+
+        if (c.getRequestedBy() != null) {
+            response.setRequestedByRmoId(c.getRequestedBy().getId());
+            response.setRequestedByRmoName(c.getRequestedBy().getRmoName());
+        }
 
         if (c.getDoctor() != null) {
             response.setDoctorId(c.getDoctor().getId());
@@ -409,6 +550,67 @@ public class ConsultationServiceImpl implements ConsultationService {
         }
 
         return response;
+    }
+
+    private DoctorOptionResponseDto mapDoctorOption(Doctor doctor) {
+        DoctorOptionResponseDto response = new DoctorOptionResponseDto();
+        response.setDoctorId(doctor.getId());
+        response.setDoctorName(doctor.getDoctorName());
+        response.setDoctorCode(doctor.getDoctorCode());
+        response.setSpecialization(doctor.getSpecialization());
+        response.setQualification(doctor.getQualification());
+        response.setMobileNumber(doctor.getMobileNumber());
+        response.setStatus(doctor.getStatus());
+        return response;
+    }
+
+    private VitalsResponseDto mapVitals(Vitals vitals) {
+        VitalsResponseDto response = new VitalsResponseDto();
+        response.setVitalId(vitals.getVitalId());
+        response.setHeight(vitals.getHeight());
+        response.setWeight(vitals.getWeight());
+        response.setTemperature(vitals.getTemprature());
+        response.setPulse(vitals.getPulse());
+        response.setSpo2(vitals.getSpo2());
+        response.setBp(vitals.getBp());
+        response.setRespiratoryRate(vitals.getRespiratoryRate());
+        response.setCreatedAt(vitals.getCreatedAt());
+        response.setUpdatedAt(vitals.getUpdatedAt());
+        if (vitals.getPatientRegistration() != null) {
+            response.setRegistrationId(vitals.getPatientRegistration().getRegistrationId());
+        }
+        if (vitals.getRecordedBy() != null) {
+            response.setRecordedByRmoId(vitals.getRecordedBy().getId());
+            response.setRecordedByRmoName(vitals.getRecordedBy().getRmoName());
+        }
+        return response;
+    }
+
+    private void applyVitals(Vitals vitals, VitalsRequestDto request) {
+        vitals.setHeight(request.getHeight());
+        vitals.setWeight(request.getWeight());
+        vitals.setTemprature(request.getTemprature());
+        vitals.setPulse(request.getPulse());
+        vitals.setSpo2(request.getSpo2());
+        vitals.setBp(request.getBp());
+        vitals.setRespiratoryRate(request.getRespiratoryRate());
+    }
+
+    private void requireRmoForRegistration(Rmo rmo, PatientRegistration registration) {
+        boolean sameHospital = rmo.getHospital() != null && registration.getHospital() != null
+                && rmo.getHospital().getId().equals(registration.getHospital().getId());
+        boolean sameClinic = rmo.getClinic() != null && registration.getClinic() != null
+                && rmo.getClinic().getId().equals(registration.getClinic().getId());
+        if (!sameHospital && !sameClinic) {
+            throw new ConflictException("RMO and patient registration must belong to the same facility");
+        }
+    }
+
+    private void requireAssignedDoctor(Consultation consultation, Doctor doctor) {
+        if (consultation.getDoctor() == null || doctor == null
+                || !consultation.getDoctor().getId().equals(doctor.getId())) {
+            throw new ConflictException("Consultation is not assigned to the current doctor");
+        }
     }
 
     private String formatAddress(String line1, String city, String state, String pin) {

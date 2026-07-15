@@ -140,15 +140,37 @@ public class AccessControlService {
 
     public Doctor requireCurrentDoctorFor(PatientRegistration registration) {
         User user = currentUser();
-        if (user.getUserType() != UserType.DOCTOR) {
-            throw new ForbiddenException("Only doctors can create prescriptions");
-        }
-        Doctor doctor = doctorRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new ForbiddenException("Doctor profile is not linked to this account"));
+        Doctor doctor = requireCurrentDoctor();
         if (doctor.getStatus() != EntityStatus.ACTIVE || !canAccess(registration, user)) {
             throw forbidden();
         }
         return doctor;
+    }
+
+    public Doctor requireCurrentDoctor() {
+        User user = currentUser();
+        if (user.getUserType() != UserType.DOCTOR) {
+            throw new ForbiddenException("Only doctors can perform this action");
+        }
+        Doctor doctor = doctorRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new ForbiddenException("Doctor profile is not linked to this account"));
+        if (doctor.getStatus() != EntityStatus.ACTIVE) {
+            throw forbidden();
+        }
+        return doctor;
+    }
+
+    public Rmo requireCurrentRmo() {
+        User user = currentUser();
+        if (user.getUserType() != UserType.RMO) {
+            throw new ForbiddenException("Only RMOs can perform this action");
+        }
+        Rmo rmo = rmoRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new ForbiddenException("RMO profile is not linked to this account"));
+        if (rmo.getStatus() != EntityStatus.ACTIVE) {
+            throw forbidden();
+        }
+        return rmo;
     }
 
     public void requireDoctorAccess(Doctor doctor) {

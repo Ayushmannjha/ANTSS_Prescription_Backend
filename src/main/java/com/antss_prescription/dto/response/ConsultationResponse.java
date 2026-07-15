@@ -2,6 +2,10 @@ package com.antss_prescription.dto.response;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+
+import com.antss_prescription.enums.ConsultationPriority;
+import com.antss_prescription.enums.ConsultationStatus;
+
 import lombok.Data;
 
 @Data
@@ -75,6 +79,17 @@ public class ConsultationResponse {
     private double spo2;
     private String bp;
     private double respiratoryRate;
+
+    // Request workflow
+    private ConsultationStatus status;
+    private ConsultationPriority priority;
+    private String consultReason;
+    private UUID requestedByRmoId;
+    private String requestedByRmoName;
+    private LocalDateTime requestedAt;
+    private LocalDateTime acceptedAt;
+    private LocalDateTime completedAt;
+    private LocalDateTime cancelledAt;
 
     // Consultation
     private String advice;
