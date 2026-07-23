@@ -3,6 +3,7 @@ package com.antss_prescription.dto.request;
 import com.antss_prescription.enums.EntityStatus;
 import jakarta.validation.constraints.*;
 import lombok.Data;
+import java.math.BigDecimal;
 
 @Data
 public class UpdateDoctorRequest {
@@ -38,6 +39,9 @@ public class UpdateDoctorRequest {
 
     @Size(max = 2048)
     private String signatureUrl;
+
+    @DecimalMin(value = "0.00", inclusive = true)
+    private BigDecimal consultationFee;
 
     @NotNull
     private EntityStatus status;

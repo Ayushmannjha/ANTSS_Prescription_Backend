@@ -58,6 +58,9 @@ public class Consultation {
     @JoinColumn(name = "vitals_id")
     private Vitals vitals;
 
+    @OneToOne(mappedBy = "consultation", fetch = FetchType.LAZY)
+    private ConsultationBill bill;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = true)
     private ConsultationStatus status = ConsultationStatus.IN_PROGRESS;

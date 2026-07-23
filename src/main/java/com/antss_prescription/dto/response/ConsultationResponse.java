@@ -96,6 +96,7 @@ public class ConsultationResponse {
     private LocalDateTime followUpDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private ConsultationBillResponse bill;
 
     // Lists for array representations
     private java.util.List<ChiefComplaintResponse> complaints;

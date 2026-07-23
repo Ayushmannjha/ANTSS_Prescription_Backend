@@ -163,7 +163,7 @@ public class AccessControlService {
     public Rmo requireCurrentRmo() {
         User user = currentUser();
         if (user.getUserType() != UserType.RMO) {
-            throw new ForbiddenException("Only RMOs can perform this action");
+            throw new ForbiddenException("Only  RMOs can perform this action");
         }
         Rmo rmo = rmoRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new ForbiddenException("RMO profile is not linked to this account"));

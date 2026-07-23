@@ -4,6 +4,7 @@ import com.antss_prescription.enums.EntityStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -20,6 +21,7 @@ public class DoctorResponse {
     private String mobileNumber;
     private String registrationNumber;
     private String signatureUrl;
+    private BigDecimal consultationFee;
     private Long hospitalId;
     private String hospitalName;
     private String hospitalAddress;

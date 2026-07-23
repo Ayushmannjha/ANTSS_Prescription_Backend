@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.hibernate.annotations.Check;
@@ -63,6 +64,9 @@ public class Doctor {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
+
+    @Column(name = "consultation_fee", precision = 10, scale = 2)
+    private BigDecimal consultationFee;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

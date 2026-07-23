@@ -29,7 +29,9 @@ public class ConsultationController {
     public ResponseEntity<ConsultationResponse> saveConsultation(
             @Valid @RequestBody ConsultationRequest request) {
         return ResponseEntity.ok(consultationService.saveConsultation(
-                ClinicalRequestMapper.toConsultation(request)));
+                ClinicalRequestMapper.toConsultation(request),
+                request.getDiscountPolicy(),
+                request.getDiscountValue()));
     }
 
     @GetMapping("/{consultationId}")

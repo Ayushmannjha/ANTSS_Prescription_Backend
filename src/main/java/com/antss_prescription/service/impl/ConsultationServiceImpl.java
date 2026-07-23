@@ -1,5 +1,6 @@
 package com.antss_prescription.service.impl;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import com.antss_prescription.dto.request.CreateConsultRequestDto;
 import com.antss_prescription.dto.request.VitalsRequestDto;
+import com.antss_prescription.dto.response.ConsultationBillResponse;
 import com.antss_prescription.dto.response.ConsultationResponse;
 import com.antss_prescription.dto.response.DoctorOptionResponseDto;
 import com.antss_prescription.dto.response.VitalsResponseDto;
@@ -27,8 +29,10 @@ import com.antss_prescription.entity.prescription.PatientRegistration;
 import com.antss_prescription.entity.prescription.Vitals;
 import com.antss_prescription.enums.ConsultationPriority;
 import com.antss_prescription.enums.ConsultationStatus;
+import com.antss_prescription.enums.DiscountPolicy;
 import com.antss_prescription.enums.EntityStatus;
 import com.antss_prescription.repository.DoctorRepository;
+import com.antss_prescription.repository.prescription.ConsultationBillRepository;
 import com.antss_prescription.repository.prescription.CheifComplaintsRepo;
 import com.antss_prescription.repository.prescription.ConsultationRepo;
 import com.antss_prescription.repository.prescription.DaignosisRepo;
@@ -40,6 +44,7 @@ import com.antss_prescription.repository.prescription.PrescriptionRepo;
 import com.antss_prescription.exception.ConflictException;
 import com.antss_prescription.exception.ResourceNotFoundException;
 import com.antss_prescription.security.AccessControlService;
+import com.antss_prescription.service.ConsultationBillService;
 import com.antss_prescription.service.ConsultationService;
 import com.antss_prescription.service.ClinicalAttributionService;
 import com.antss_prescription.websocket.ConsultationRequestWebSocketHandler;
@@ -62,11 +67,16 @@ public class ConsultationServiceImpl implements ConsultationService {
     private final PrescriptionRepo prescriptionRepository;
     private final ClinicalAttributionService clinicalAttributionService;
     private final ConsultationRequestWebSocketHandler consultationRequestWebSocketHandler;
+    private final ConsultationBillService consultationBillService;
+    private final ConsultationBillRepository consultationBillRepository;
 
 
     @Override
     @Transactional
-    public ConsultationResponse saveConsultation(Consultation consultation) {
+    public ConsultationResponse saveConsultation(
+            Consultation consultation,
+            DiscountPolicy discountPolicy,
+            BigDecimal discountValue) {
 
         resolveAndAuthorizeRelationships(consultation);
 
@@ -126,7 +136,9 @@ public class ConsultationServiceImpl implements ConsultationService {
         consultation.setCreatedAt(LocalDateTime.now());
         consultation.setUpdatedAt(LocalDateTime.now());
 
-        return mapToResponse(consultationRepo.save(consultation));
+        Consultation saved = consultationRepo.save(consultation);
+        consultationBillService.generateBill(saved, discountPolicy, discountValue);
+        return mapToResponse(saved);
     }
 
     @Override
@@ -210,6 +222,7 @@ public class ConsultationServiceImpl implements ConsultationService {
     @Transactional
     public ConsultationResponse createConsultRequest(CreateConsultRequestDto request) {
         Rmo rmo = accessControl.requireCurrentRmo();
+       
         PatientRegistration registration = registrationRepository.findById(request.getRegistrationId())
                 .orElseThrow(() -> new RuntimeException("Patient registration not found"));
         accessControl.requireRegistrationAccess(registration);
@@ -246,6 +259,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         }
 
         Consultation saved = consultationRepo.save(consultation);
+        consultationBillService.generateBill(saved, request.getDiscountPolicy(), request.getDiscountValue());
         consultationRequestWebSocketHandler.publishConsultationRequestCreated(saved);
         return mapToResponse(saved);
     }
@@ -549,6 +563,33 @@ public class ConsultationServiceImpl implements ConsultationService {
             response.setRespiratoryRate(c.getVitals().getRespiratoryRate());
         }
 
+        consultationBillRepository.findByConsultationConsultationId(c.getConsultationId())
+                .map(this::mapBill)
+                .ifPresent(response::setBill);
+
+        return response;
+    }
+
+    private ConsultationBillResponse mapBill(com.antss_prescription.entity.prescription.ConsultationBill bill) {
+        ConsultationBillResponse response = new ConsultationBillResponse();
+        response.setBillId(bill.getBillId());
+        response.setBillNumber(bill.getBillNumber());
+        response.setConsultationId(bill.getConsultation() == null ? null : bill.getConsultation().getConsultationId());
+        response.setConsultationNumber(bill.getConsultation() == null ? null : bill.getConsultation().getConsultationNumber());
+        response.setDoctorId(bill.getDoctor() == null ? null : bill.getDoctor().getId());
+        response.setDoctorName(bill.getDoctor() == null ? null : bill.getDoctor().getDoctorName());
+        response.setRegistrationId(bill.getPatientRegistration() == null ? null : bill.getPatientRegistration().getRegistrationId());
+        response.setRegistrationNumber(bill.getPatientRegistration() == null ? null : bill.getPatientRegistration().getRegistrationNumber());
+        response.setPatientName(bill.getPatientRegistration() == null ? null : bill.getPatientRegistration().getPatientName());
+        response.setPatientMobileNumber(bill.getPatientRegistration() == null ? null : bill.getPatientRegistration().getMobileNumber());
+        response.setConsultationFee(bill.getConsultationFee());
+        response.setDiscountPolicy(bill.getDiscountPolicy());
+        response.setDiscountValue(bill.getDiscountValue());
+        response.setDiscountAmount(bill.getDiscountAmount());
+        response.setPayableAmount(bill.getPayableAmount());
+        response.setPaymentStatus(bill.getPaymentStatus());
+        response.setCreatedAt(bill.getCreatedAt());
+        response.setUpdatedAt(bill.getUpdatedAt());
         return response;
     }
 
@@ -560,6 +601,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         response.setSpecialization(doctor.getSpecialization());
         response.setQualification(doctor.getQualification());
         response.setMobileNumber(doctor.getMobileNumber());
+        response.setConsultationFee(doctor.getConsultationFee());
         response.setStatus(doctor.getStatus());
         return response;
     }

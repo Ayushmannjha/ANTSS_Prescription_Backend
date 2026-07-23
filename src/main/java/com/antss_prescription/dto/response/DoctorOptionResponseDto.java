@@ -1,5 +1,6 @@
 package com.antss_prescription.dto.response;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import com.antss_prescription.enums.EntityStatus;
@@ -14,5 +15,6 @@ public class DoctorOptionResponseDto {
     private String specialization;
     private String qualification;
     private String mobileNumber;
+    private BigDecimal consultationFee;
     private EntityStatus status;
 }

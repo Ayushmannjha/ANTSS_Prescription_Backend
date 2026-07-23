@@ -1,10 +1,14 @@
 package com.antss_prescription.dto.request;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import com.antss_prescription.enums.DiscountPolicy;
+
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -32,6 +36,9 @@ public class ConsultationRequest {
     private List<HistoryRequest> medicalHistories;
     @Valid
     private VitalsRequest vitals;
+    private DiscountPolicy discountPolicy = DiscountPolicy.NONE;
+    @DecimalMin(value = "0.00", inclusive = true)
+    private BigDecimal discountValue = BigDecimal.ZERO;
 
     @Data
     public static class ComplaintRequest {

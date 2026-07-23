@@ -2,6 +2,7 @@ package com.antss_prescription.dto.request;
 
 import jakarta.validation.constraints.*;
 import lombok.Data;
+import java.math.BigDecimal;
 
 @Data
 public class CreateDoctorRequest {
@@ -37,6 +38,9 @@ public class CreateDoctorRequest {
 
     @Size(max = 2048)
     private String signatureUrl;
+
+    @DecimalMin(value = "0.00", inclusive = true)
+    private BigDecimal consultationFee;
 
     @Positive
     private Long hospitalId;

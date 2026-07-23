@@ -140,6 +140,7 @@ public class DoctorServiceImpl implements DoctorService {
         doctor.setMobileNumber(request.getMobileNumber());
         doctor.setRegistrationNumber(request.getRegistrationNumber());
         doctor.setSignatureUrl(request.getSignatureUrl());
+        doctor.setConsultationFee(request.getConsultationFee());
         doctor.setDoctorCode(generateUniqueDoctorCode());
         doctor.setStatus(EntityStatus.ACTIVE);
         doctor.setUser(savedDoctorUser);
@@ -185,6 +186,7 @@ public class DoctorServiceImpl implements DoctorService {
         response.setMobileNumber(doctor.getMobileNumber());
         response.setRegistrationNumber(doctor.getRegistrationNumber());
         response.setSignatureUrl(doctor.getSignatureUrl());
+        response.setConsultationFee(doctor.getConsultationFee());
         response.setStatus(doctor.getStatus());
 
         if (doctor.getHospital() != null) {
@@ -220,6 +222,7 @@ public class DoctorServiceImpl implements DoctorService {
         doctor.setMobileNumber(request.getMobileNumber());
         doctor.setRegistrationNumber(request.getRegistrationNumber());
         doctor.setSignatureUrl(request.getSignatureUrl());
+        doctor.setConsultationFee(request.getConsultationFee());
         EntityStatus newStatus = request.getStatus();
         doctor.setStatus(newStatus);
         Doctor saved = doctorRepository.save(doctor);
